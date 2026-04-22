@@ -164,7 +164,6 @@ class NpmEcosystem(Ecosystem):
         return list(packages.values())
 
     def _load_all(self) -> list[InstalledPackage]:
-        dep_names = self._read_root_package_json()
         data = self._npm_list(depth=None)
 
         # If we're inside a workspace member, npm list walks up to the
@@ -175,56 +174,37 @@ class NpmEcosystem(Ecosystem):
         if member_node is not None:
             data = member_node
 
-        # Build a reverse-dep graph from package-lock.json so we can attribute
-        # each transitive dep to a principal.
-        required_by = self._build_required_by()
+        # Dedupe by (name, version), not by name. npm routinely installs the
+        # same package at multiple distinct versions — one hoisted to the
+        # shallowest node_modules, others nested under specific parents — and
+        # each copy actually loads at runtime for whichever code requires it.
+        # Treat them as separate installations so cooldown checks see all of
+        # them. The npm-list tree gives us the exact path that pulled in each
+        # copy, so via_chain is read straight from the walk position rather
+        # than reconstructed from the lockfile graph.
+        packages: dict[tuple[str, str], InstalledPackage] = {}
 
-        def find_via_chain(name: str) -> tuple[str, ...]:
-            visited = {name}
-            prev: dict[str, str] = {}
-            queue = [name]
-            while queue:
-                node = queue.pop(0)
-                if node in dep_names and node != name:
-                    path: list[str] = []
-                    cur = node
-                    while cur != name:
-                        path.append(cur)
-                        cur = prev[cur]
-                    path.reverse()
-                    return tuple(path)
-                for parent in required_by.get(node, ()):
-                    if parent not in visited:
-                        visited.add(parent)
-                        prev[parent] = node
-                        queue.append(parent)
-            return ()
-
-        packages: dict[str, InstalledPackage] = {}
-
-        def collect(node: dict[str, Any]) -> None:
-            # Two-pass per node: register every direct child first, then
-            # recurse. Top-level wins over deeply nested copies — important
-            # because npm hoists the shallowest version to ``node_modules/<pkg>``
-            # and that's the one that actually gets loaded at runtime. A naive
-            # depth-first walk would let a transitive duplicate shadow it.
-            children = (node.get("dependencies") or {}).items()
-            for name, info in children:
+        def collect(node: dict[str, Any], chain: tuple[str, ...]) -> None:
+            for name, info in (node.get("dependencies") or {}).items():
                 version = info.get("version")
                 if not version:
                     continue
-                if name not in packages:
-                    via_chain = () if name in dep_names else find_via_chain(name)
-                    packages[name] = InstalledPackage(
+                key = (name, version)
+                if key not in packages:
+                    # Empty chain means this is a top-level installation —
+                    # report it as a principal. Anything deeper gets the
+                    # ancestor path (immediate parent first, principal last)
+                    # as its via_chain.
+                    via_chain: tuple[str, ...] = tuple(reversed(chain))
+                    packages[key] = InstalledPackage(
                         name=name,
                         version=version,
                         ecosystem=self.kind,
                         via_chain=via_chain,
                     )
-            for _, info in children:
-                collect(info)
+                collect(info, chain + (name,))
 
-        collect(data)
+        collect(data, ())
 
         return list(packages.values())
 
@@ -295,41 +275,6 @@ class NpmEcosystem(Ecosystem):
                     return p
             cur = cur.parent
         return None
-
-    def _build_required_by(self) -> dict[str, set[str]]:
-        lock_path = self._find_lockfile()
-        if lock_path is None:
-            logger.warning(
-                f"No package-lock.json found at or above {self.root}; "
-                "transitive dependency attribution will be skipped."
-            )
-            return {}
-        try:
-            lock = json.loads(lock_path.read_text())
-        except json.JSONDecodeError:
-            logger.warning(f"Skipping unreadable lockfile: {lock_path}")
-            return {}
-        required_by: dict[str, set[str]] = {}
-        for path, info in (lock.get("packages") or {}).items():
-            # Lockfile entries have keys like "node_modules/foo" or
-            # "node_modules/foo/node_modules/bar"; the parent name we want is
-            # the segment after the LAST "node_modules/".
-            if "node_modules/" not in path:
-                # The empty key represents the root package; principals get
-                # listed there.
-                if path == "":
-                    continue
-                # Workspace member entries (e.g. "api") are skipped — they
-                # describe a project, not an installed package.
-                continue
-            name = path.rsplit("node_modules/", 1)[1]
-            for dep in (info.get("dependencies") or {}).keys():
-                required_by.setdefault(dep, set()).add(name)
-            for dep in (info.get("peerDependencies") or {}).keys():
-                required_by.setdefault(dep, set()).add(name)
-            for dep in (info.get("optionalDependencies") or {}).keys():
-                required_by.setdefault(dep, set()).add(name)
-        return required_by
 
     def _npm_list(self, depth: int | None) -> dict[str, Any]:
         cmd = ["npm", "list", "--all", "--json"]

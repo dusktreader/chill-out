@@ -315,15 +315,17 @@ class TestNpmEcosystemLoadDeep:
             pkgs = eco.load_installed(deep=False)
         assert pkgs == []
 
-    def test_top_level_version_wins_over_nested_duplicate(self, tmp_path: Path) -> None:
-        """A direct pin must shadow a deeper transitive copy of the same package."""
+    def test_reports_each_distinct_version_separately(self, tmp_path: Path) -> None:
+        """Multiple installed versions of the same package each get their own entry."""
         _write_pkg_json(
             tmp_path / "package.json",
             {"name": "app", "dependencies": {"big": "^1", "leaf": "1.0.0"}},
         )
         (tmp_path / "package-lock.json").write_text(json.dumps({"packages": {}}))
-        # `big` lists an iteration order before `leaf`, and its nested `leaf` is
-        # at the unsafe version; the top-level pin sits at the safe version.
+        # leaf appears twice: top-level at 1.0.0 (the user's pin) and nested
+        # under big at 2.0.0 (a transitive that npm couldn't dedupe). Both
+        # copies are real installations under their respective node_modules
+        # directories and both should be reported.
         npm_list = {
             "dependencies": {
                 "big": {
@@ -336,10 +338,13 @@ class TestNpmEcosystemLoadDeep:
         eco = NpmEcosystem(tmp_path)
         with patch.object(NpmEcosystem, "_npm_list", return_value=npm_list):
             pkgs = eco.load_installed(deep=True)
-        by_name = {p.name: p for p in pkgs}
-        assert by_name["leaf"].version == "1.0.0", (
-            "shallowest version should win because npm hoists it to node_modules/<pkg>"
-        )
+        leaf_versions = {p.version for p in pkgs if p.name == "leaf"}
+        assert leaf_versions == {"1.0.0", "2.0.0"}
+        # The top-level copy is a principal (declared in package.json) so
+        # via_chain is empty; the nested copy is attributed to its parent.
+        leaves_by_version = {p.version: p for p in pkgs if p.name == "leaf"}
+        assert leaves_by_version["1.0.0"].via_chain == ()
+        assert leaves_by_version["2.0.0"].via_chain == ("big",)
 
     def test_scopes_to_workspace_member_subtree(self, tmp_path: Path) -> None:
         """When run from a workspace member, only that member's subtree is loaded."""
@@ -421,75 +426,6 @@ class TestNpmFindLockfile:
         result = eco._find_lockfile()
         if result is not None:
             assert tmp_path not in result.parents and result.parent != tmp_path
-
-
-class TestNpmBuildRequiredBy:
-    """The reverse-dep graph powers `via_chain` attribution for transitives."""
-
-    def test_handles_nested_node_modules_keys(self, tmp_path: Path) -> None:
-        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
-        (tmp_path / "package-lock.json").write_text(
-            json.dumps(
-                {
-                    "packages": {
-                        "": {"name": "app"},
-                        "node_modules/foo": {"dependencies": {"bar": "^1"}},
-                        "node_modules/foo/node_modules/bar": {"dependencies": {"leaf": "^1"}},
-                    }
-                }
-            )
-        )
-        eco = NpmEcosystem(tmp_path)
-        required_by = eco._build_required_by()
-        # The nested key "node_modules/foo/node_modules/bar" should attribute
-        # `leaf` to `bar` (the segment after the last `node_modules/`), not to
-        # `foo/node_modules/bar`.
-        assert required_by["leaf"] == {"bar"}
-        assert required_by["bar"] == {"foo"}
-
-    def test_includes_optional_dependencies(self, tmp_path: Path) -> None:
-        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
-        (tmp_path / "package-lock.json").write_text(
-            json.dumps(
-                {
-                    "packages": {
-                        "node_modules/foo": {"optionalDependencies": {"opt": "^1"}},
-                    }
-                }
-            )
-        )
-        eco = NpmEcosystem(tmp_path)
-        required_by = eco._build_required_by()
-        assert required_by["opt"] == {"foo"}
-
-    def test_skips_workspace_member_entries(self, tmp_path: Path) -> None:
-        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
-        (tmp_path / "package-lock.json").write_text(
-            json.dumps(
-                {
-                    "packages": {
-                        "": {"name": "root"},
-                        "api": {"name": "api", "dependencies": {"foo": "^1"}},
-                        "node_modules/foo": {},
-                    }
-                }
-            )
-        )
-        eco = NpmEcosystem(tmp_path)
-        required_by = eco._build_required_by()
-        # The workspace member's deps must not be attributed (workspace v1
-        # explicitly out of scope), so `foo` has no requirers from the member.
-        assert "foo" not in required_by
-
-    def test_warns_and_returns_empty_when_no_lockfile(self, tmp_path: Path) -> None:
-        # Use an isolated subdirectory so the walk-up can't accidentally find
-        # a real lockfile on disk.
-        member = tmp_path / "lonely"
-        member.mkdir()
-        _write_pkg_json(member / "package.json", {"name": "lonely"})
-        eco = NpmEcosystem(member)
-        with patch.object(NpmEcosystem, "_find_lockfile", return_value=None):
-            assert eco._build_required_by() == {}
 
 
 class TestNpmFetchVersionManifest:
