@@ -60,6 +60,11 @@ dependencies = [
     { name = "typer" },
 ]
 
+[package.optional-dependencies]
+demo = [
+    { name = "respx" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "debugpy" },
@@ -87,12 +92,14 @@ requires-dist = [
     { name = "pendulum", specifier = ">=3.0" },
     { name = "py-buzz", specifier = ">=8.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "respx", marker = "extra == 'demo'", specifier = ">=0.22" },
     { name = "rich", specifier = ">=14.0,<15.0.0" },
     { name = "semver", specifier = ">=3.0" },
     { name = "snick", specifier = ">=3.0" },
     { name = "tomlkit", specifier = ">=0.13" },
     { name = "typer", specifier = ">=0.24.1" },
 ]
+provides-extras = ["demo"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -102,7 +109,7 @@ dev = [
     { name = "pygments", specifier = ">=2.19" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-asyncio", specifier = ">=0.24" },
-    { name = "pytest-bdd", specifier = ">=7.0" },
+    { name = "pytest-bdd", specifier = ">=8.0" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-mock", specifier = ">=3.14" },
     { name = "pytest-pretty", specifier = ">=1.2" },

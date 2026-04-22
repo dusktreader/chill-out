@@ -6,7 +6,34 @@ authors = [
     {name = "Tucker Beck", email ="tucker.beck@gmail.com"},
 ]
 readme = "README.md"
+license = "MIT"
 license-files = ["LICENSE.md"]
+keywords = [
+    "cooldown",
+    "dependencies",
+    "supply-chain",
+    "security",
+    "npm",
+    "pypi",
+    "dependabot",
+    "renovate",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Quality Assurance",
+    "Typing :: Typed",
+]
 
 requires-python = ">=3.12, <3.15"
 
@@ -24,6 +51,11 @@ dependencies = [
     "typer>=0.24.1",
 ]
 
+[project.optional-dependencies]
+demo = [
+    "respx>=0.22",
+]
+
 [project.scripts]
 chill-out = "chill_out.cli.main:cli"
 chill-out-demo = "chill_out_demo.main:main"
@@ -31,6 +63,7 @@ chill-out-demo = "chill_out_demo.main:main"
 
 [project.urls]
 homepage = "https://github.com/dusktreader/chill-out"
+documentation = "https://dusktreader.github.io/chill-out/"
 source = "https://github.com/dusktreader/chill-out"
 changelog = "https://github.com/dusktreader/chill-out/blob/main/CHANGELOG.md"
 
@@ -43,7 +76,7 @@ dev = [
     "pygments>=2.19",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
-    "pytest-bdd>=7.0",
+    "pytest-bdd>=8.0",
     "pytest-cov>=6.0",
     "pytest-mock>=3.14",
     "pytest-pretty>=1.2",
@@ -59,6 +92,11 @@ dev = [
 package = true
 
 
+[tool.uv.build-backend]
+module-name = ["chill_out", "chill_out_demo"]
+module-root = "src"
+
+
 [tool.pytest.ini_options]
 addopts = [
     "--random-order",
@@ -70,15 +108,15 @@ addopts = [
 ]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-python_files = ["test_*.py", "*_steps.py"]
+python_files = ["test_*.py"]
 markers = [
     "integration: Integration tests that exercise the real package with no mocking",
     "unit: Fast unit tests with all external dependencies mocked",
+    "bdd: Behavior-driven tests written with pytest-bdd",
 ]
 
 [tool.coverage.run]
 omit = [
-    "src/chill_out/main.py",
     "src/chill_out_demo/*",
 ]
 
@@ -97,5 +135,5 @@ extend-ignore-identifiers-re = []
 
 
 [build-system]
-requires = ["uv-build>=0.1.0"]
+requires = ["uv_build>=0.9.27,<0.11.0"]
 build-backend = "uv_build"
