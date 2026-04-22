@@ -1,22 +1,25 @@
-# Examples
+# chill-out examples
 
-This directory contains example scripts demonstrating how to use chill-out.
+Each example is a self-contained, runnable script that exercises one slice of
+the `chill-out` API. They are intentionally small so that they double as
+copy-paste templates for real automation scripts.
 
-## Available Examples
+| File                          | What it demonstrates                                        |
+|-------------------------------|-------------------------------------------------------------|
+| `cli_check.sh`                | Running the CLI against the current directory               |
+| `programmatic_pypi.py`        | Calling `check_async` on a Python project from your code    |
+| `programmatic_npm.py`         | Calling `check_async` on an npm project                     |
+| `custom_config.py`            | Building a `CooldownConfig` in code instead of from a file  |
+| `inspect_safe_versions.py`    | Using the pure cooldown helpers without the orchestrator    |
 
-- `basic_example.py` - Basic usage example showing core functionality
-
-## Running Examples
-
-You can run any example directly with Python:
+Run any Python example with:
 
 ```bash
-uv run python examples/basic_example.py
+uv run python examples/programmatic_pypi.py
 ```
 
-Or install the package and run it:
+The CLI example is a shell script:
 
 ```bash
-uv sync
-uv run python examples/basic_example.py
+bash examples/cli_check.sh
 ```

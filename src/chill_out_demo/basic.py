@@ -1,22 +1,82 @@
-"""Basic demo functions for chill-out."""
+"""
+Basic demos showing chill-out's pure-Python API.
 
-from chill_out import __version__
+Each function is self-contained and prints to stdout so the demo runner can
+display the captured output alongside the source.
+"""
+
+from __future__ import annotations
+
+import pendulum
+
+from chill_out import (
+    BumpType,
+    CooldownConfig,
+    PackageInfo,
+    PackageRelease,
+    __version__,
+    find_safe_version,
+    is_within_cooldown,
+    release_type,
+)
 
 
-def demo_version():
+def demo_01_version() -> None:
     """
-    This demo shows how to get the version of `chill-out`.
+    Print the installed `chill-out` version.
 
-    The version is available as a module-level variable.
+    The version string is exposed as a module-level constant so library callers
+    can check compatibility without running a subprocess.
     """
-    print(f"chill-out version: {__version__}")
+    print(f"chill-out {__version__}")
 
 
-def demo_hello_world():
+def demo_02_release_type() -> None:
     """
-    This demo shows a simple hello world example.
+    Classify a version string into a major / minor / patch bump.
 
-    This is a placeholder demo that you can replace with actual features.
+    `release_type` understands semver and falls back to `BumpType.DEFAULT` for
+    anything it cannot parse.
     """
-    print("Hello from chill-out!")
-    print("Replace this with your own demo functions.")
+    for version in ("2.0.0", "2.1.0", "2.1.3", "garbage"):
+        kind = release_type(version)
+        print(f"{version:10s} -> {kind.value}")
+
+
+def demo_03_is_within_cooldown() -> None:
+    """
+    Check whether a single release is still inside its cooldown window.
+
+    `is_within_cooldown` returns a tuple of `(violating, age_days, limit_days)`
+    so callers can render their own messaging.
+    """
+    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.DEFAULT: 5})
+    published = pendulum.now("UTC").subtract(days=2)
+    violating, age, limit = is_within_cooldown(published, BumpType.MAJOR, config)
+    print(f"violating={violating}  age={age}d  limit={limit}d")
+
+
+def demo_04_find_safe_version() -> None:
+    """
+    Suggest the newest released version that has cleared its own cooldown.
+
+    The result includes both the version string and how many days it has been
+    available so users can judge the rollback risk.
+    """
+    now = pendulum.now("UTC")
+    info = PackageInfo(
+        name="example",
+        releases={
+            "2.0.0": PackageRelease(version="2.0.0", published=now.subtract(days=1)),
+            "1.5.0": PackageRelease(version="1.5.0", published=now.subtract(days=60)),
+            "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
+        },
+    )
+    config = CooldownConfig(
+        days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5}
+    )
+    safe = find_safe_version("2.0.0", info, config)
+    if safe is None:
+        print("no safe rollback target")
+    else:
+        print(f"safe rollback: {safe.version} ({safe.age_days}d old)")
