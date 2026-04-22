@@ -45,4 +45,5 @@ chill-out check
 - [Comparison](comparison.md) shows where chill-out fits relative to Renovate, Dependabot, and other tools
 - [CLI](cli.md) is the full command reference
 - [Programmatic API](api.md) shows how to use `chill-out` from your own code
+- [GitHub Actions](github-actions.md) collects recipes for running chill-out in CI
 - [Reference](reference.md) is the auto-generated API documentation
