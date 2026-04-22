@@ -306,17 +306,88 @@ project's own manifest), but the conflict-detection now sees the actual
 constraint structure.
 
 
+## Workspace support: tier 1 (visibility) and tier 2 (override routing)
+
+The original v1 stance was "single-root only, run chill-out from each
+member's directory in a monorepo." That assumption breaks in npm
+workspaces with shared transitives: a member-level pin in
+`api/package.json` only changes what `api` resolves to. The hoisted
+copy at the workspace-root `node_modules/`, the one another member
+pulled in, stays put. The fix flow declares success because *its*
+member is now clean, but the next chill-out run from a different
+member still flags the same violating version.
+
+The library now detects workspaces and routes shared violations
+through the ecosystem's override mechanism automatically.
+
+**Tier 1 (detection and visibility).** A new `WorkspaceTopology` model
+captures `(root, members)`. Each ecosystem implements
+`workspace_topology()`: npm reads the `workspaces` field of the
+lockfile-rooted `package.json` (accepting both array and object
+forms), uv walks up looking for `[tool.uv.workspace]` and reads each
+member's `project.name`. `InstalledPackage` gained `member_owners`,
+populated by walking each `file:`-resolved top-level entry in the
+workspace-root's `npm list` output and tagging every reachable
+install with that member's name. A package with two or more owners
+is `is_shared`. The reporting layer surfaces the sharing in the
+strategy column as `(shared: api, worker; will use overrides)`.
+
+A subtle gotcha caught during live verification: when self.root is a
+workspace member, npm scopes its own `npm list --all --json` output
+to that member's subtree. The ownership index then attributed every
+install to a single member and `is_shared` was always False. Fixed
+by adding `_npm_list_at_workspace_root`, which runs npm list from
+the lockfile-owning ancestor when self.root is a member.
+
+**Tier 2 (routing through overrides).** `FixAction` gained
+`via_overrides: bool`. The runner sets it on any shared transitive
+violation through a small `pin()` helper:
+
+```python
+use_overrides = v.is_shared and bool(v.via)
+```
+
+Direct (non-via) violations stay as plain pins even when shared,
+because they live in the project's own manifest where the user
+explicitly declared them. `apply_fixes` splits incoming actions by
+the flag and routes each batch separately: direct actions go through
+the existing `_apply_direct_fixes` (manifest edit + lock), override
+actions go through `apply_override_fixes`.
+
+Each ecosystem implements `apply_override_fixes` against its native
+mechanism:
+
+- npm writes the workspace root's `package.json` `overrides` field
+  and runs `npm install` from there.
+- uv writes `[tool.uv].override-dependencies` in the workspace
+  root's `pyproject.toml` (or self.root if no workspace) and runs
+  `uv lock`. Existing entries for the same package name are dropped
+  before appending so re-runs don't accumulate duplicates.
+
+The CLI's old "post-recheck override fallback" still exists as
+belt-and-suspenders for the case where a direct pin survives the
+first pass (npm's lockfile stickiness can still leave a hoisted copy
+in place even after `npm install`). With Tier 2 routing the planner
+catches most shared cases on the first pass, so the fallback rarely
+fires.
+
+Tier 3 (lockfile manipulation) and Tier 4 (delegate to arborist/uv
+internals) remain out of scope.
+
+The npm puzzle in `examples/npm-puzzle/` is an anonymized fixture
+for reproducing the shared-transitive resolution conflict end-to-end
+without needing access to a private corporate registry.
+
+
 ## What is not done
 
 A few things from the original script were intentionally deferred:
 
-- **Monorepo / workspace support.** v1 deliberately treats each project as a
-  flat single-root layout. The npm backend reads only the root `package.json`
-  and ignores nested ones; the pypi backend reads only the root
-  `pyproject.toml` and ignores `[tool.uv.workspace]` members. For a monorepo,
-  run `chill-out` from each sub-project's directory. A workspace-aware mode
-  (per-member detection, dispatch with `npm install --workspace=` and
-  `uv sync --package=`) is a candidate for a future release.
+- **Lockfile manipulation (Tier 3).** When npm's `overrides` write
+  doesn't dislodge a sticky hoisted copy, the only sure cure is
+  `rm package-lock.json && npm install`. chill-out flags the
+  surviving violation but doesn't take that destructive step
+  automatically.
 - **Disk-backed registry cache.** The in-memory cache is per-process. CI
   runs that invoke `chill-out` repeatedly will refetch each time. A simple
   TTL cache under `platformdirs.user_cache_dir()` would close that gap.
