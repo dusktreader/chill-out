@@ -62,6 +62,37 @@ uses these to drive a Rich progress bar; library callers can drive any UI
 that exposes "set total" and "advance" semantics.
 
 
+## Choosing a fix style
+
+`plan_fixes` accepts a `fix_style` keyword that controls the shape of each
+emitted pin. The default is `FixStyle.EXACT`, which mirrors what the CLI
+does without `--fix-style`:
+
+```python
+from chill_out import FixStyle, plan_fixes
+
+plan = plan_fixes(report, fix_style=FixStyle.COMPATIBLE)
+for action in plan.actions:
+    print(action.package, action.style, action.version)
+```
+
+`plan_fixes_async` reads the style from `config.fix_style` instead of
+taking it as a kwarg, since it already takes a full `CooldownConfig`. Pass
+a config with the field set:
+
+```python
+from dataclasses import replace
+from chill_out import load_config
+
+config = replace(load_config(eco.root, eco.kind), fix_style=FixStyle.COMPATIBLE)
+plan = await plan_fixes_async(report, eco, config=config, http=http)
+```
+
+In both forms, override-bound and principal-rollback actions stay exact
+regardless of the requested style. The `style` field on each `FixAction`
+records what actually got written.
+
+
 ## Planning fixes with conflict-aware rollback
 
 `plan_fixes(report)` returns a `FixPlan` with a flat list of direct pins and a

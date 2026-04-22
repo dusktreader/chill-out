@@ -196,7 +196,9 @@ The runnable demos are an honest template for two common automation patterns:
 - A pre-merge CI check that runs `chill-out check` and fails the build if any
   cooldown violation is fresh enough to need attention.
 - A scheduled job that runs `chill-out check --fix` and opens a PR with the
-  resulting manifest changes.
+  resulting manifest changes. Pair with `--fix-style compatible` if you'd
+  rather emit ranges than hard pins so the resolver picks up safe future
+  releases without another `--fix` pass.
 
 For real CI, drop the mocks and let chill-out talk to the real registry. The
 fixture projects exist so you can read a known-good `package.json` and

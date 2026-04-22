@@ -89,7 +89,9 @@ The exit code is the contract:
 ```
 
 If a violation appears, the job fails with exit code 2 and the table is in the
-log.
+log. See [GitHub Actions](github-actions.md) for the full set of recipes:
+scheduled audits, separating cooldown signal from the test matrix, opening
+issues from violations, and caching the registry calls.
 
 
 ## Speed knobs
@@ -104,4 +106,5 @@ log.
 
 - [Configuration](configuration.md) for tuning the thresholds
 - [CLI](cli.md) for every flag
+- [GitHub Actions](github-actions.md) for CI recipes
 - [Programmatic API](api.md) for calling `chill-out` from your own code
