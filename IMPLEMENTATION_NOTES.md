@@ -118,6 +118,31 @@ project in a half-applied state. Keeping rollback as the conflict-resolution
 fallback gives both ecosystems the same shape: try the simple thing, fall
 back to the principled thing only when the simple thing won't resolve.
 
+### npm lockfile resolution
+
+The npm backend builds a reverse-dep graph from `package-lock.json` so that
+deep mode can attribute each transitive to a principal via BFS. The lookup
+order matters because workspace members frequently have no lockfile of their
+own:
+
+1. `<root>/package-lock.json` — the standard location.
+2. `<root>/node_modules/.package-lock.json` — npm writes one of these every
+   time it installs, even when the project doesn't ship a top-level lockfile.
+3. The same two paths walking up the directory tree to the filesystem root,
+   so a workspace member can borrow its workspace root's lockfile.
+
+If nothing turns up, the backend logs a warning and proceeds with an empty
+graph; deep mode still enumerates packages but every transitive ends up
+without a `via_chain`.
+
+The lockfile entry keys can take nested forms like
+`node_modules/foo/node_modules/bar` whenever the resolver couldn't hoist a
+transitive to the top. The parent-name extraction splits on the *last*
+`node_modules/` so `bar` (not `foo/node_modules/bar`) shows up as the
+requirer for whatever `bar` itself depends on. The graph also reads from
+`optionalDependencies` in addition to `dependencies` and `peerDependencies`
+so optional transitives still get attributed correctly.
+
 ### Registry caching
 
 `CachingRegistryClient` wraps any `RegistryClient` with a per-process,

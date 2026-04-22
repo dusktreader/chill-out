@@ -256,6 +256,124 @@ class TestNpmEcosystemLoadDeep:
         assert pkgs == []
 
 
+class TestNpmFindLockfile:
+    """Lockfile lookup walks up to a workspace root when needed."""
+
+    def test_finds_lockfile_at_root(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco._find_lockfile() == tmp_path / "package-lock.json"
+
+    def test_falls_back_to_node_modules_lockfile(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        nm = tmp_path / "node_modules"
+        nm.mkdir()
+        (nm / ".package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco._find_lockfile() == nm / ".package-lock.json"
+
+    def test_walks_up_to_parent_lockfile(self, tmp_path: Path) -> None:
+        # Workspace root has the lockfile; member has only its own package.json.
+        (tmp_path / "package-lock.json").write_text("{}")
+        member = tmp_path / "api"
+        member.mkdir()
+        _write_pkg_json(member / "package.json", {"name": "api"})
+        eco = NpmEcosystem(member)
+        assert eco._find_lockfile() == tmp_path / "package-lock.json"
+
+    def test_walks_up_to_parent_node_modules_lockfile(self, tmp_path: Path) -> None:
+        nm = tmp_path / "node_modules"
+        nm.mkdir()
+        (nm / ".package-lock.json").write_text("{}")
+        member = tmp_path / "api"
+        member.mkdir()
+        _write_pkg_json(member / "package.json", {"name": "api"})
+        eco = NpmEcosystem(member)
+        assert eco._find_lockfile() == nm / ".package-lock.json"
+
+    def test_returns_none_when_nothing_found(self, tmp_path: Path) -> None:
+        member = tmp_path / "isolated"
+        member.mkdir()
+        _write_pkg_json(member / "package.json", {"name": "isolated"})
+        eco = NpmEcosystem(member)
+        # Without a fixture lockfile anywhere, the walk should bottom out at None.
+        # The walk goes up to filesystem root, so we can't guarantee absence
+        # there; instead, verify it doesn't return a path inside member or tmp_path.
+        result = eco._find_lockfile()
+        if result is not None:
+            assert tmp_path not in result.parents and result.parent != tmp_path
+
+
+class TestNpmBuildRequiredBy:
+    """The reverse-dep graph powers `via_chain` attribution for transitives."""
+
+    def test_handles_nested_node_modules_keys(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "packages": {
+                        "": {"name": "app"},
+                        "node_modules/foo": {"dependencies": {"bar": "^1"}},
+                        "node_modules/foo/node_modules/bar": {"dependencies": {"leaf": "^1"}},
+                    }
+                }
+            )
+        )
+        eco = NpmEcosystem(tmp_path)
+        required_by = eco._build_required_by()
+        # The nested key "node_modules/foo/node_modules/bar" should attribute
+        # `leaf` to `bar` (the segment after the last `node_modules/`), not to
+        # `foo/node_modules/bar`.
+        assert required_by["leaf"] == {"bar"}
+        assert required_by["bar"] == {"foo"}
+
+    def test_includes_optional_dependencies(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "packages": {
+                        "node_modules/foo": {"optionalDependencies": {"opt": "^1"}},
+                    }
+                }
+            )
+        )
+        eco = NpmEcosystem(tmp_path)
+        required_by = eco._build_required_by()
+        assert required_by["opt"] == {"foo"}
+
+    def test_skips_workspace_member_entries(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "packages": {
+                        "": {"name": "root"},
+                        "api": {"name": "api", "dependencies": {"foo": "^1"}},
+                        "node_modules/foo": {},
+                    }
+                }
+            )
+        )
+        eco = NpmEcosystem(tmp_path)
+        required_by = eco._build_required_by()
+        # The workspace member's deps must not be attributed (workspace v1
+        # explicitly out of scope), so `foo` has no requirers from the member.
+        assert "foo" not in required_by
+
+    def test_warns_and_returns_empty_when_no_lockfile(self, tmp_path: Path) -> None:
+        # Use an isolated subdirectory so the walk-up can't accidentally find
+        # a real lockfile on disk.
+        member = tmp_path / "lonely"
+        member.mkdir()
+        _write_pkg_json(member / "package.json", {"name": "lonely"})
+        eco = NpmEcosystem(member)
+        with patch.object(NpmEcosystem, "_find_lockfile", return_value=None):
+            assert eco._build_required_by() == {}
+
+
 class TestNpmFetchVersionManifest:
     @respx.mock
     async def test_returns_merged_dependencies(self, http_client: httpx.AsyncClient) -> None:

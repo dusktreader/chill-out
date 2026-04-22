@@ -200,22 +200,71 @@ class NpmEcosystem(Ecosystem):
 
         return list(packages.values())
 
+    def _find_lockfile(self) -> Path | None:
+        """
+        Locate a usable lockfile for transitive attribution.
+
+        Looks in this order:
+
+        1. ``<root>/package-lock.json`` — the standard location.
+        2. ``<root>/node_modules/.package-lock.json`` — npm writes one of
+           these whenever it installs, even when the project itself doesn't
+           ship a lockfile (workspace members, for instance).
+        3. The same two paths walking up the directory tree, so a workspace
+           member can borrow its workspace root's lockfile.
+
+        Returns the first existing path or ``None``.
+        """
+        candidates = [
+            self.root / "package-lock.json",
+            self.root / "node_modules" / ".package-lock.json",
+        ]
+        for c in candidates:
+            if c.is_file():
+                return c
+        cur = self.root.parent
+        seen: set[Path] = set()
+        while cur != cur.parent and cur not in seen:
+            seen.add(cur)
+            for tail in ("package-lock.json", "node_modules/.package-lock.json"):
+                p = cur / tail
+                if p.is_file():
+                    return p
+            cur = cur.parent
+        return None
+
     def _build_required_by(self) -> dict[str, set[str]]:
-        lock_path = self.root / "package-lock.json"
-        if not lock_path.is_file():
+        lock_path = self._find_lockfile()
+        if lock_path is None:
+            logger.warning(
+                f"No package-lock.json found at or above {self.root}; "
+                "transitive dependency attribution will be skipped."
+            )
             return {}
         try:
             lock = json.loads(lock_path.read_text())
         except json.JSONDecodeError:
+            logger.warning(f"Skipping unreadable lockfile: {lock_path}")
             return {}
         required_by: dict[str, set[str]] = {}
         for path, info in (lock.get("packages") or {}).items():
-            if not path.startswith("node_modules/"):
+            # Lockfile entries have keys like "node_modules/foo" or
+            # "node_modules/foo/node_modules/bar"; the parent name we want is
+            # the segment after the LAST "node_modules/".
+            if "node_modules/" not in path:
+                # The empty key represents the root package; principals get
+                # listed there.
+                if path == "":
+                    continue
+                # Workspace member entries (e.g. "api") are skipped — they
+                # describe a project, not an installed package.
                 continue
-            name = path.removeprefix("node_modules/")
+            name = path.rsplit("node_modules/", 1)[1]
             for dep in (info.get("dependencies") or {}).keys():
                 required_by.setdefault(dep, set()).add(name)
             for dep in (info.get("peerDependencies") or {}).keys():
+                required_by.setdefault(dep, set()).add(name)
+            for dep in (info.get("optionalDependencies") or {}).keys():
                 required_by.setdefault(dep, set()).add(name)
         return required_by
 

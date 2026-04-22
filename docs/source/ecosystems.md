@@ -34,6 +34,15 @@ Workspaces are not supported in v1. If your repository is an npm workspace
 monorepo, run chill-out from each sub-project's directory rather than from the
 workspace root.
 
+When the backend looks for `package-lock.json`, it tries the project root
+first, then `node_modules/.package-lock.json` (the copy npm writes whenever it
+installs), then walks up the directory tree trying both names at each level.
+That last step lets a workspace member borrow its workspace root's lockfile so
+transitive attribution still works when chill-out is run from a sub-project
+that has no lockfile of its own. If no lockfile turns up anywhere on the way to
+the filesystem root, the backend logs a warning and skips transitive
+attribution for that run.
+
 `--fix` writes safe versions into the root `package.json`:
 
 - both principal and transitive violations land as direct entries in
