@@ -32,22 +32,21 @@ violation shared across two or more members.
 Run from the workspace root:
 
 ```
-chill-out check --root examples/shop-monorepo --deep --fix
+chill-out check --root examples/fixtures/shop-monorepo --deep --fix
 ```
 
 Expected behavior: chill-out detects `@smithy/util-endpoints@3.4.2`
 as a violation, sees it's owned by both `@shop/api` and `@shop/worker`,
-and writes the fix to `examples/shop-monorepo/package.json`'s
+and writes the fix to `examples/fixtures/shop-monorepo/package.json`'s
 `overrides` field instead of editing any member's `dependencies`. The
 strategy column shows
 `(shared: @shop/api, @shop/worker; will use overrides)` to flag the
 shared-routing decision before the fix runs.
 
-
 ## Setup
 
 ```
-cd examples/shop-monorepo
+cd examples/fixtures/shop-monorepo
 npm install
 ```
 

@@ -1,10 +1,16 @@
 # chill-out examples
 
-Two flavors of example live here. The flat scripts are micro-templates that
-exercise one slice of the API at a time. The `projects/` directory contains
-two full example projects (one npm, one Python) with real-shaped manifests
-and lockfiles, plus a demo script that runs the whole check + fix pipeline
-end-to-end against them.
+Three flavors of example live here:
+
+1. **API templates** at the top level. Single-purpose scripts that
+   exercise one slice of the public API.
+2. **Hermetic project demos** under `projects/`. Small but realistic
+   single-root projects with mocked registries and stubbed
+   subprocess calls. Run offline with one command and reproduce
+   reliably from a fresh checkout.
+3. **Live fixtures** under `fixtures/`. Real workspaces that need
+   `npm install` (or equivalent) to set up. Used to reproduce
+   resolution conflicts that mocks can't capture faithfully.
 
 ## API templates
 
@@ -28,28 +34,34 @@ The CLI example is a shell script:
 bash examples/cli_check.sh
 ```
 
-## End-to-end project examples
+## Hermetic project demos
 
-| Project                        | Ecosystem | Walkthrough                                          |
-|--------------------------------|-----------|------------------------------------------------------|
-| `projects/npm-app/`            | npm       | direct pin + principal rollback on conflict          |
-| `projects/python-app/`         | pypi      | direct pin + principal rollback on conflict          |
-| `shop-monorepo/`               | npm       | shared transitive routed through workspace overrides |
+| Project                | Ecosystem | Walkthrough                                 |
+|------------------------|-----------|---------------------------------------------|
+| `projects/npm-app/`    | npm       | direct pin + principal rollback on conflict |
+| `projects/python-app/` | pypi      | direct pin + principal rollback on conflict |
 
-Each `projects/` example has a real `package.json` / `pyproject.toml`, a
-lockfile, a `.chill-out.yaml` config, and a `run_demo.py` that mocks the
-registry and prints the full check report, the planned fix actions, and
-the resulting manifest after `--fix` runs:
+Each project has a real `package.json` / `pyproject.toml`, a lockfile, a
+`.chill-out.yaml` config, and a `run_demo.py` that mocks the registry
+and prints the full check report, the planned fix actions, and the
+resulting manifest after `--fix` runs:
 
 ```bash
 uv run python examples/projects/npm-app/run_demo.py
 uv run python examples/projects/python-app/run_demo.py
 ```
 
-`shop-monorepo/` is a live npm workspace fixture (no mocks). Install
-its deps with `npm install` and then run chill-out against the
-workspace root to see Tier 1 detection of a shared transitive plus
-Tier 2 routing of the fix through the workspace-root `overrides`
-field. See [`shop-monorepo/README.md`](shop-monorepo/README.md).
-
 The narrated walkthrough lives in [`docs/source/examples.md`](../docs/source/examples.md).
+
+## Live fixtures
+
+| Fixture                      | Ecosystem | What it reproduces                                   |
+|------------------------------|-----------|------------------------------------------------------|
+| `fixtures/shop-monorepo/`    | npm       | shared transitive routed through workspace overrides |
+
+Live fixtures aren't self-contained demos. They're real project
+layouts that you `npm install` (or equivalent) and then point
+chill-out at. Used for reproducing resolution pathologies that only
+show up against a real package manager and registry. See the per-
+fixture README for the setup steps and the expected chill-out
+behavior.

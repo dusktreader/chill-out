@@ -374,10 +374,10 @@ fires.
 Tier 3 (lockfile manipulation) and Tier 4 (delegate to arborist/uv
 internals) remain out of scope.
 
-The shop-monorepo example in `examples/shop-monorepo/` is an
-anonymized fixture for reproducing the shared-transitive resolution
-conflict end-to-end without needing access to a private corporate
-registry.
+The shop-monorepo example in `examples/fixtures/shop-monorepo/` is
+an anonymized fixture for reproducing the shared-transitive
+resolution conflict end-to-end without needing access to a private
+corporate registry.
 
 
 ## What is not done
