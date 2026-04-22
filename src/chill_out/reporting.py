@@ -36,46 +36,87 @@ def render_thresholds(config: CooldownConfig, console: Console) -> None:
     console.print(table)
 
 
-def _fmt_pkg_label(name: str, version: str | None, rel_type: ReleaseType | None = None) -> str:
-    """Render a single package label suitable for a tree node."""
+def _fmt_pkg_node(name: str, version: str | None, age_days: int | None = None) -> str:
+    """Render a package label for a non-violating tree node.
+
+    Shows ``name = version`` with an optional age suffix when known. Used for
+    principals and intermediates that aren't themselves violating; the report
+    doesn't carry their ages, so the suffix is normally omitted for those.
+    """
     if version is None:
         return f"[bold]{name}[/bold]"
-    color = _RELEASE_COLOR.get(rel_type, "white") if rel_type else "white"
-    return f"[bold]{name}[/bold] [{color}]{version}[/{color}]"
+    age_str = f" [dim]({age_days}d old)[/dim]" if age_days is not None else ""
+    return f"[bold]{name}[/bold] = [dim]{version}[/dim]{age_str}"
 
 
-def _build_via_tree(
+def _fmt_violating_pkg_node(violation: Violation) -> str:
+    """Render the package label for the violating leaf row.
+
+    Uses the release-type color on the version and calls out the age vs limit
+    in red so the violation reads at a glance.
+    """
+    color = _RELEASE_COLOR.get(violation.release_type, "white")
+    return (
+        f"[bold]{violation.name}[/bold] = [{color}]{violation.version}[/{color}]"
+        f" [red](age {violation.age_days}d > {violation.limit_days}d)[/red]"
+    )
+
+
+def _fmt_limit_node(rel_type: ReleaseType, limit_days: int) -> str:
+    """Render a limit-column label: release type plus the threshold in days."""
+    color = _RELEASE_COLOR.get(rel_type, "white")
+    return f"[{color}]{rel_type.value}[/{color}] [dim]{limit_days}d[/dim]"
+
+
+def _build_pkg_tree(
     violation: Violation,
     installed_index: dict[str, InstalledPackage],
 ) -> Tree:
-    """
-    Render the dependency chain that pulled the violating package in.
+    """Render the dependency chain that pulled the violating package in.
 
-    The shape mirrors the upstream script: the principal sits at the root, each
-    intermediate transitive becomes a child node, and the violating package
-    itself is the leaf. Intermediate nodes pull their version info from the
-    installed-package index so the chain stays grounded in the project's
-    actual lockfile.
+    Principal at the root, intermediates as children, the violating package
+    itself as the leaf with its age vs limit called out.
     """
     chain_top_down = list(reversed(violation.package.via_chain))
     principal_name = chain_top_down[0]
     principal_pkg = installed_index.get(principal_name)
     principal_version = principal_pkg.version if principal_pkg else None
-    principal_rel = release_type(principal_version) if principal_version else None
-    tree = Tree(_fmt_pkg_label(principal_name, principal_version, principal_rel), guide_style="dim")
+    tree = Tree(_fmt_pkg_node(principal_name, principal_version), guide_style="dim")
     node = tree
     for intermediate in chain_top_down[1:]:
         ipkg = installed_index.get(intermediate)
         iver = ipkg.version if ipkg else None
-        irel = release_type(iver) if iver else None
-        node = node.add(_fmt_pkg_label(intermediate, iver, irel))
-    leaf_color = _RELEASE_COLOR.get(violation.release_type, "white")
-    leaf = (
-        f"[bold]{violation.name}[/bold] "
-        f"[{leaf_color}]{violation.version}[/{leaf_color}] "
-        f"[red](age {violation.age_days}d > {violation.limit_days}d)[/red]"
-    )
-    node.add(leaf)
+        node = node.add(_fmt_pkg_node(intermediate, iver))
+    node.add(_fmt_violating_pkg_node(violation))
+    return tree
+
+
+def _build_limit_tree(
+    violation: Violation,
+    installed_index: dict[str, InstalledPackage],
+    config: CooldownConfig,
+) -> Tree:
+    """Render a parallel tree for the limit column, mirroring the package tree.
+
+    Each node shows the release type and threshold of the corresponding
+    package in the chain. The leaf shows the violation's own release type
+    and limit; non-violating ancestors get their values from
+    ``release_type(version)`` and the cooldown config.
+    """
+    chain_top_down = list(reversed(violation.package.via_chain))
+
+    def node_label_for(name: str) -> str:
+        pkg = installed_index.get(name)
+        if pkg is None:
+            return "[dim]-[/dim]"
+        rel = release_type(pkg.version)
+        return _fmt_limit_node(rel, config.for_release_type(rel))
+
+    tree = Tree(node_label_for(chain_top_down[0]), guide_style="dim")
+    node = tree
+    for intermediate in chain_top_down[1:]:
+        node = node.add(node_label_for(intermediate))
+    node.add(_fmt_limit_node(violation.release_type, violation.limit_days))
     return tree
 
 
@@ -86,8 +127,7 @@ def _fmt_pin(name: str, version: str, age_days: int | None) -> str:
 
 
 def _build_strategy(violation: Violation) -> Tree | str:
-    """
-    Render the recommended fix recipe for a violation.
+    """Render the recommended fix recipe for a violation.
 
     For a principal violation, the strategy is a single pin of the violating
     package itself. For a transitive, it's a tree showing the chain from the
@@ -117,13 +157,23 @@ def _build_strategy(violation: Violation) -> Tree | str:
     return tree
 
 
-def render_report(report: CheckReport, console: Console, *, fast: bool = False) -> None:
-    """
-    Print a summary of the report.
+def render_report(
+    report: CheckReport,
+    console: Console,
+    *,
+    config: CooldownConfig,
+    fast: bool = False,
+) -> None:
+    """Print a summary of the report.
 
     When there are no violations, prints a single success line and returns.
-    Transitive violations are rendered as a dependency tree so the chain
-    that pulled them in is visible at a glance.
+    Otherwise renders one row per violation with three columns:
+
+    - **Package**: ``name = version (<n>d old)`` for principals, or a tree from
+      principal down to the violating leaf for transitives.
+    - **Limit**: a parallel tree showing each chain member's release type and
+      threshold, so the reader can see why the leaf tripped.
+    - **Strategy**: the explicit fix recipe (omitted under ``--fast``).
     """
     if not report.violations:
         console.print(
@@ -143,24 +193,18 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
 
     table = Table(show_header=True, header_style="bold cyan", show_lines=has_via)
     table.add_column("Package", min_width=40)
-    table.add_column("Release Type")
-    table.add_column("Age", justify="right")
-    table.add_column("Limit", justify="right")
+    table.add_column("Limit")
     if not fast:
         table.add_column("Strategy", min_width=45)
 
     for v in sorted(report.violations, key=lambda x: x.name):
-        rel_color = _RELEASE_COLOR.get(v.release_type, "white")
         if v.via:
-            pkg_cell = _build_via_tree(v, installed_index)
+            pkg_cell: Tree | str = _build_pkg_tree(v, installed_index)
+            limit_cell: Tree | str = _build_limit_tree(v, installed_index, config)
         else:
-            pkg_cell = _fmt_pkg_label(v.name, v.version, v.release_type)
-        row = [
-            pkg_cell,
-            f"[{rel_color}]{v.release_type.value}[/{rel_color}]",
-            f"{v.age_days}d",
-            f"{v.limit_days}d",
-        ]
+            pkg_cell = _fmt_violating_pkg_node(v)
+            limit_cell = _fmt_limit_node(v.release_type, v.limit_days)
+        row: list[Tree | str] = [pkg_cell, limit_cell]
         if not fast:
             row.append(_build_strategy(v))
         table.add_row(*row)

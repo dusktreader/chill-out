@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import functools
 import io
 
 import pendulum
 from chill_out.config import CooldownConfig
 from chill_out.constants import ReleaseType, EcosystemKind
 from chill_out.models import CheckReport, InstalledPackage, SafeVersion, Violation
-from chill_out.reporting import render_report, render_thresholds
+from chill_out.reporting import render_report as _render_report
+from chill_out.reporting import render_thresholds
 from rich.console import Console
+
+_DEFAULT_CFG = CooldownConfig(
+    days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5}
+)
+render_report = functools.partial(_render_report, config=_DEFAULT_CFG)
 
 
 def _capture(fn, *args, **kwargs) -> str:

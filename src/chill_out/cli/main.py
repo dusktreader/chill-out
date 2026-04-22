@@ -138,7 +138,7 @@ def check(
 
     with progress:
         report, plan = asyncio.run(_run())
-    render_report(report, console, fast=fast)
+    render_report(report, console, config=config, fast=fast)
 
     if fix and report.has_violations and plan is not None:
         if plan.unfixable:

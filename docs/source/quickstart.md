@@ -39,20 +39,21 @@ A violation row looks roughly like this:
 
 ```text
 2 cooldown violation(s) in 14 pypi package(s):
-┌─────────────┬──────────────┬──────┬───────┬──────────────────────────────┐
-│ Package     │ Release Type │  Age │ Limit │ Strategy                     │
-├─────────────┼──────────────┼──────┼───────┼──────────────────────────────┤
-│ requests    │ minor        │   3d │   10d │ requests -> 2.30.0 (45d old) │
-│ urllib3     │ minor        │   1d │   10d │ urllib3 -> 2.0.6 (60d old)   │
-└─────────────┴──────────────┴──────┴───────┴──────────────────────────────┘
+┌────────────────────────────────────┬───────────┬──────────────────────────────┐
+│ Package                            │ Limit     │ Strategy                     │
+├────────────────────────────────────┼───────────┼──────────────────────────────┤
+│ requests = 2.31.0 (age 3d > 10d)   │ minor 10d │ requests -> 2.30.0 (45d old) │
+│ urllib3 = 2.0.7 (age 1d > 10d)     │ minor 10d │ urllib3 -> 2.0.6 (60d old)   │
+└────────────────────────────────────┴───────────┴──────────────────────────────┘
 ```
 
-The "Strategy" column tells you exactly which package to pin and to what
-version. For a principal violation that's just the violating package itself.
-For a transitive violation, the strategy renders as a tree showing the chain
-from the principal down to the transitive, with the explicit pin at the leaf,
-so it's unambiguous that the fix targets the transitive rather than rolling
-the principal back.
+The "Package" column shows the violating dep with its installed version and
+the age vs limit called out. For a transitive violation, the column renders
+as a tree from the principal down to the violating leaf, and the "Limit"
+column shows a parallel tree so you can see each chain member's release type
+and threshold side by side. The "Strategy" column tells you exactly which
+package to pin and to what version, so it's unambiguous that the fix targets
+the transitive rather than rolling the principal back.
 
 
 ## Apply a fix
