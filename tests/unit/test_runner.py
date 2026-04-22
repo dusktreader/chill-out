@@ -66,7 +66,7 @@ def now() -> pendulum.DateTime:
 
 @pytest.fixture
 def config() -> CooldownConfig:
-    return CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
+    return CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
 
 
 class TestCheckAsync:
@@ -624,3 +624,76 @@ class TestPlanFixesViaOverridesRouting:
         plan = await plan_fixes_async(report, eco, config=config, now=now)
         assert len(plan.actions) == 1
         assert plan.actions[0].via_overrides is False
+
+
+class TestFilterByGroups:
+    """Runner filters out installed packages whose groups don't intersect include_groups."""
+
+    def test_keeps_packages_in_allowed_groups(self) -> None:
+        from chill_out.constants import DependencyGroup
+        from chill_out.runner import _filter_by_groups
+
+        cfg = CooldownConfig(include_groups=(DependencyGroup.MAIN,))
+        pkgs = [
+            InstalledPackage(name="a", version="1", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.MAIN,)),
+            InstalledPackage(name="b", version="2", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.DEV,)),
+            InstalledPackage(
+                name="c", version="3", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.MAIN, DependencyGroup.DEV)
+            ),
+        ]
+        kept = {p.name for p in _filter_by_groups(pkgs, cfg)}
+        # `b` is dev-only and gets dropped; `c` is kept because it intersects MAIN.
+        assert kept == {"a", "c"}
+
+    def test_keeps_packages_with_no_attributed_groups(self) -> None:
+        from chill_out.runner import _filter_by_groups
+
+        # Empty `groups` means "ecosystem didn't attribute" -- conservatively kept
+        # so older callers and test fixtures keep working.
+        cfg = CooldownConfig()
+        pkgs = [InstalledPackage(name="legacy", version="1", ecosystem=EcosystemKind.NPM)]
+        assert _filter_by_groups(pkgs, cfg) == pkgs
+
+    def test_empty_include_groups_drops_everything(self) -> None:
+        from chill_out.constants import DependencyGroup
+        from chill_out.runner import _filter_by_groups
+
+        cfg = CooldownConfig(include_groups=())
+        pkgs = [
+            InstalledPackage(name="a", version="1", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.MAIN,)),
+            InstalledPackage(name="b", version="2", ecosystem=EcosystemKind.NPM),
+        ]
+        assert _filter_by_groups(pkgs, cfg) == []
+
+    async def test_check_async_skips_filtered_packages_entirely(self, now) -> None:
+        """Filtered packages don't even get a registry call; they vanish from the report."""
+        from chill_out.constants import DependencyGroup
+
+        cfg = CooldownConfig(
+            cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5},
+            include_groups=(DependencyGroup.MAIN,),
+        )
+        eco = _FakeEcosystem(
+            packages=[
+                InstalledPackage(
+                    name="prod-pkg", version="1.0.0", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.MAIN,)
+                ),
+                InstalledPackage(
+                    name="dev-pkg", version="1.0.0", ecosystem=EcosystemKind.NPM, groups=(DependencyGroup.DEV,)
+                ),
+            ],
+            data={
+                "prod-pkg": PackageInfo(
+                    name="prod-pkg",
+                    releases={"1.0.0": PackageRelease(version="1.0.0", published=now.subtract(days=200))},
+                ),
+                "dev-pkg": PackageInfo(
+                    name="dev-pkg",
+                    releases={"1.0.0": PackageRelease(version="1.0.0", published=now.subtract(days=200))},
+                ),
+            },
+        )
+        report = await check_async(eco, config=cfg, now=now)
+        names_checked = {p.name for p in report.checked}
+        # Only the MAIN package is in the checked set; dev-pkg never made it past the filter.
+        assert names_checked == {"prod-pkg"}

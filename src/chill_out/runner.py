@@ -116,7 +116,8 @@ async def check_async(
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
-    packages = ecosystem.load_installed(deep=deep)
+    all_packages = ecosystem.load_installed(deep=deep)
+    packages = _filter_by_groups(all_packages, config)
     if on_start is not None:
         on_start(list(packages))
     semaphore = asyncio.Semaphore(concurrency)
@@ -379,6 +380,31 @@ def _candidate_principal_versions(
         if violating:
             continue
         out.append(ver_str)
+    return out
+
+
+def _filter_by_groups(
+    packages: list[InstalledPackage], config: CooldownConfig
+) -> list[InstalledPackage]:
+    """
+    Drop installed packages whose semantic groups don't intersect ``include_groups``.
+
+    A package with an empty ``groups`` tuple is treated as "unknown origin"
+    and always kept; this preserves the historical behavior for ecosystem
+    backends or test fixtures that don't attribute groups. Packages with at
+    least one group are kept only when at least one of their groups is in
+    the configured set.
+    """
+    allowed = config.include_group_set
+    if not allowed:
+        return []
+    out: list[InstalledPackage] = []
+    for pkg in packages:
+        if not pkg.groups:
+            out.append(pkg)
+            continue
+        if any(g in allowed for g in pkg.groups):
+            out.append(pkg)
     return out
 
 

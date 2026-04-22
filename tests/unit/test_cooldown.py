@@ -39,7 +39,7 @@ class TestReleaseType:
 
 class TestIsWithinCooldown:
     def test_fresh_release_violates(self, fixed_now: pendulum.DateTime) -> None:
-        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
+        config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
         published = fixed_now.subtract(days=2)
         violating, age, limit = is_within_cooldown(published, ReleaseType.MAJOR, config, now=fixed_now)
         assert violating is True
@@ -47,7 +47,7 @@ class TestIsWithinCooldown:
         assert limit == 30
 
     def test_old_release_passes(self, fixed_now: pendulum.DateTime) -> None:
-        config = CooldownConfig(days={ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
+        config = CooldownConfig(cooldown_days={ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         published = fixed_now.subtract(days=30)
         violating, age, limit = is_within_cooldown(published, ReleaseType.PATCH, config, now=fixed_now)
         assert violating is False
@@ -70,7 +70,7 @@ class TestFindSafeVersion:
                 "1.4.0": fixed_now.subtract(days=120),  # safe, but not newest
             }
         )
-        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
+        config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         safe = find_safe_version("2.0.0", info, config, now=fixed_now)
         assert safe is not None
         assert safe.version == "1.5.0"
@@ -83,7 +83,7 @@ class TestFindSafeVersion:
                 "1.5.0": fixed_now.subtract(days=2),  # also too fresh
             }
         )
-        config = CooldownConfig(days={ReleaseType.MINOR: 30, ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
+        config = CooldownConfig(cooldown_days={ReleaseType.MINOR: 30, ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
         assert find_safe_version("2.0.0", info, config, now=fixed_now) is None
 
     def test_skips_prereleases(self, fixed_now: pendulum.DateTime) -> None:
@@ -94,7 +94,7 @@ class TestFindSafeVersion:
                 "1.0.0": fixed_now.subtract(days=200),
             }
         )
-        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 30, ReleaseType.PATCH: 30, ReleaseType.DEFAULT: 5})
+        config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 30, ReleaseType.PATCH: 30, ReleaseType.DEFAULT: 5})
         safe = find_safe_version("2.0.0", info, config, now=fixed_now)
         assert safe is not None
         assert safe.version == "1.0.0"

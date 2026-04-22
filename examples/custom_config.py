@@ -34,7 +34,7 @@ def main() -> None:
 
     # Strict policy: even patch releases need 14 days to settle.
     config = CooldownConfig(
-        days={
+        cooldown_days={
             ReleaseType.MAJOR: 60,
             ReleaseType.MINOR: 30,
             ReleaseType.PATCH: 14,

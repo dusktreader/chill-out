@@ -33,6 +33,33 @@ class EcosystemKind(StrEnum):
     PYPI = "pypi"
 
 
+class DependencyGroup(StrEnum):
+    """
+    Semantic dependency group names used uniformly across ecosystems.
+
+    Each ecosystem maps these names to its native concepts:
+
+    * **npm**: ``main`` -> ``dependencies``; ``dev`` -> ``devDependencies``;
+      ``optional`` -> ``optionalDependencies``; ``peer`` -> ``peerDependencies``.
+    * **pypi**: ``main`` -> ``[project.dependencies]``;
+      ``dev`` -> ``[dependency-groups.dev]`` plus
+      ``[project.optional-dependencies.dev]`` when present;
+      ``optional`` -> all other ``[project.optional-dependencies.*]`` extras.
+      ``peer`` is unused on pypi.
+    """
+
+    MAIN = "main"
+    DEV = "dev"
+    OPTIONAL = "optional"
+    PEER = "peer"
+
+
+# Default set of groups checked when the config doesn't specify one.
+# Restricted to ``main`` so that dev/test/optional dependencies don't trip
+# cooldown checks unless the project explicitly opts them in.
+DEFAULT_INCLUDE_GROUPS: tuple[DependencyGroup, ...] = (DependencyGroup.MAIN,)
+
+
 # Default cooldown thresholds (in days) used when no config source supplies them.
 DEFAULT_COOLDOWN_DAYS: dict[ReleaseType, int] = {
     ReleaseType.MAJOR: 30,

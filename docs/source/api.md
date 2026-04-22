@@ -123,7 +123,7 @@ info = PackageInfo(
         "1.5.0": PackageRelease("1.5.0", now.subtract(days=60)),
     },
 )
-config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
+config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
 
 rel_type = release_type("2.0.0")
 violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), rel_type, config)

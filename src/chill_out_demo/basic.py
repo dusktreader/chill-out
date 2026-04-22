@@ -49,7 +49,7 @@ def demo_03_is_within_cooldown() -> None:
     `is_within_cooldown` returns a tuple of `(violating, age_days, limit_days)`
     so callers can render their own messaging.
     """
-    config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
+    config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
     published = pendulum.now("UTC").subtract(days=2)
     violating, age, limit = is_within_cooldown(published, ReleaseType.MAJOR, config)
     print(f"violating={violating}  age={age}d  limit={limit}d")
@@ -71,7 +71,7 @@ def demo_04_find_safe_version() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
+    config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
     safe = find_safe_version("2.0.0", info, config)
     if safe is None:
         print("no safe rollback target")

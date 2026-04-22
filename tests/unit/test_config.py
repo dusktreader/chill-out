@@ -12,15 +12,15 @@ from chill_out.exceptions import ConfigError
 
 class TestCooldownConfig:
     def test_for_release_type_uses_explicit_value(self) -> None:
-        cfg = CooldownConfig(days={ReleaseType.MAJOR: 60})
+        cfg = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 60})
         assert cfg.for_release_type(ReleaseType.MAJOR) == 60
 
     def test_for_release_type_falls_back_to_default(self) -> None:
-        cfg = CooldownConfig(days={ReleaseType.DEFAULT: 9})
+        cfg = CooldownConfig(cooldown_days={ReleaseType.DEFAULT: 9})
         assert cfg.for_release_type(ReleaseType.MINOR) == 9
 
     def test_for_release_type_falls_back_to_hard_default_when_default_missing(self) -> None:
-        cfg = CooldownConfig(days={ReleaseType.MAJOR: 60})
+        cfg = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 60})
         assert cfg.for_release_type(ReleaseType.MINOR) == DEFAULT_COOLDOWN_DAYS[ReleaseType.DEFAULT]
 
 
@@ -166,3 +166,57 @@ class TestPackageJsonSource:
         (tmp_path / "package.json").write_text('{"name":"x","version":"1.0.0","chill-out":"oops"}')
         cfg = load_config(tmp_path, EcosystemKind.NPM)
         assert cfg.for_release_type(ReleaseType.MAJOR) == DEFAULT_COOLDOWN_DAYS[ReleaseType.MAJOR]
+
+
+class TestIncludeGroups:
+    """Loading and merging behavior for include_groups across config sources."""
+
+    def test_default_is_main_only(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.include_groups == (DependencyGroup.MAIN,)
+
+    def test_chill_out_yaml_sets_include_groups(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / ".chill-out.yaml").write_text(
+            "include_groups: [main, dev]\n"
+        )
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.include_groups == (DependencyGroup.MAIN, DependencyGroup.DEV)
+
+    def test_pyproject_table_sets_include_groups(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.chill-out]\ninclude_groups = ["main", "optional"]\n'
+        )
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        assert cfg.include_groups == (DependencyGroup.MAIN, DependencyGroup.OPTIONAL)
+
+    def test_yaml_overrides_pyproject_for_groups(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.chill-out]\ninclude_groups = ["main"]\n'
+        )
+        (tmp_path / ".chill-out.yaml").write_text("include_groups: [dev]\n")
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        # The higher-priority yaml wins wholesale; it's not unioned with pyproject's value.
+        assert cfg.include_groups == (DependencyGroup.DEV,)
+
+    def test_unknown_group_raises_config_error(self, tmp_path: Path) -> None:
+        (tmp_path / ".chill-out.yaml").write_text("include_groups: [bogus]\n")
+        with pytest.raises(ConfigError, match="Unknown dependency group"):
+            load_config(tmp_path, EcosystemKind.NPM)
+
+    def test_non_list_raises_config_error(self, tmp_path: Path) -> None:
+        (tmp_path / ".chill-out.yaml").write_text('include_groups: "main"\n')
+        with pytest.raises(ConfigError, match="must be a list"):
+            load_config(tmp_path, EcosystemKind.NPM)
+
+    def test_explicit_empty_list_is_respected(self, tmp_path: Path) -> None:
+        (tmp_path / ".chill-out.yaml").write_text("include_groups: []\n")
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.include_groups == ()

@@ -19,7 +19,7 @@ import httpx
 import pendulum
 from loguru import logger
 
-from chill_out.constants import EcosystemKind
+from chill_out.constants import DependencyGroup, EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
 from chill_out.models import (
@@ -32,6 +32,17 @@ from chill_out.models import (
 )
 
 NPM_REGISTRY = "https://registry.npmjs.org"
+
+# Maps each ``package.json`` dependency section to its semantic group.
+# Used in both directions: direct attribution from the manifest, and
+# transitive inheritance when walking the npm-list tree per top-level
+# group.
+NPM_SECTION_GROUPS: dict[str, DependencyGroup] = {
+    "dependencies": DependencyGroup.MAIN,
+    "devDependencies": DependencyGroup.DEV,
+    "optionalDependencies": DependencyGroup.OPTIONAL,
+    "peerDependencies": DependencyGroup.PEER,
+}
 
 
 class NpmRegistryClient(RegistryClient):
@@ -114,29 +125,34 @@ class NpmEcosystem(Ecosystem):
             return self._load_all()
         return self._load_direct()
 
-    def _read_root_package_json(self) -> set[str]:
+    def _read_root_package_json(self) -> dict[str, set[DependencyGroup]]:
         """
-        Read the root ``package.json`` and return the set of declared dependency names.
+        Read the root ``package.json`` and return a per-dependency group map.
+
+        The returned mapping is keyed by package name; each value is the set
+        of semantic groups the package is declared in. A single package can
+        appear in multiple sections (e.g. both ``dependencies`` and
+        ``peerDependencies``) and gets every matching group.
 
         Workspaces and nested ``package.json`` files are intentionally ignored;
         for monorepos, run chill-out from each sub-project's directory.
         """
-        dep_names: set[str] = set()
+        groups_by_name: dict[str, set[DependencyGroup]] = {}
         root_pkg = self.root / "package.json"
         if not root_pkg.is_file():
-            return dep_names
+            return groups_by_name
         try:
             doc = json.loads(root_pkg.read_text())
         except json.JSONDecodeError:
             logger.warning(f"Skipping unreadable package.json: {root_pkg}")
-            return dep_names
-        for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+            return groups_by_name
+        for section, group in NPM_SECTION_GROUPS.items():
             for name in doc.get(section, {}) or {}:
-                dep_names.add(name)
-        return dep_names
+                groups_by_name.setdefault(name, set()).add(group)
+        return groups_by_name
 
     def _load_direct(self) -> list[InstalledPackage]:
-        dep_names = self._read_root_package_json()
+        groups_by_name = self._read_root_package_json()
         # Use the full tree because workspace members appear as `file:`-resolved
         # top-level entries; their actual installed deps are nested one level
         # deeper. Descending into those nodes lets a workspace member find its
@@ -155,7 +171,7 @@ class NpmEcosystem(Ecosystem):
                     if descend_workspace:
                         collect(info, descend_workspace=False)
                     continue
-                if name not in dep_names:
+                if name not in groups_by_name:
                     continue
                 version = info.get("version")
                 if not version:
@@ -165,6 +181,7 @@ class NpmEcosystem(Ecosystem):
                         name=name,
                         version=version,
                         ecosystem=self.kind,
+                        groups=tuple(sorted(groups_by_name[name], key=lambda g: g.value)),
                     )
 
         collect(data, descend_workspace=True)
@@ -193,14 +210,44 @@ class NpmEcosystem(Ecosystem):
         if member_node is not None:
             data = member_node
 
+        # Group attribution for the deep walk: read this project's own
+        # package.json to find which top-level names belong to which
+        # semantic group, then walk the npm-list tree once per top-level
+        # entry and tag every reachable (name, version) with the group of
+        # that top-level. Transitives reached through multiple top-levels
+        # accumulate the union of their groups, matching the runner's
+        # "included if reachable through any included group" semantic.
+        groups_by_name = self._read_root_package_json()
+        groups_by_install: dict[tuple[str, str], set[DependencyGroup]] = {}
+
+        def attribute(node: dict[str, Any], group: DependencyGroup) -> None:
+            for name, info in (node.get("dependencies") or {}).items():
+                version = info.get("version")
+                if not version:
+                    continue
+                groups_by_install.setdefault((name, version), set()).add(group)
+                attribute(info, group)
+
+        for top_name, top_info in (data.get("dependencies") or {}).items():
+            top_version = top_info.get("version")
+            if not top_version:
+                continue
+            # Top-level entries declared in package.json get their declared
+            # groups; anything not declared at the root (orphaned installs,
+            # for instance) gets MAIN as a conservative default so it isn't
+            # filtered out unexpectedly.
+            top_groups = groups_by_name.get(top_name, {DependencyGroup.MAIN})
+            for g in top_groups:
+                attribute({"dependencies": {top_name: top_info}}, g)
+
         # Dedupe by (name, version), not by name. npm routinely installs the
-        # same package at multiple distinct versions — one hoisted to the
-        # shallowest node_modules, others nested under specific parents — and
-        # each copy actually loads at runtime for whichever code requires it.
-        # Treat them as separate installations so cooldown checks see all of
-        # them. The npm-list tree gives us the exact path that pulled in each
-        # copy, so via_chain is read straight from the walk position rather
-        # than reconstructed from the lockfile graph.
+        # same package at multiple distinct versions -- one hoisted to the
+        # shallowest node_modules, others nested under specific parents --
+        # and each copy actually loads at runtime for whichever code requires
+        # it. Treat them as separate installations so cooldown checks see all
+        # of them. The npm-list tree gives us the exact path that pulled in
+        # each copy, so via_chain is read straight from the walk position
+        # rather than reconstructed from the lockfile graph.
         packages: dict[tuple[str, str], InstalledPackage] = {}
 
         def collect(node: dict[str, Any], chain: tuple[str, ...]) -> None:
@@ -210,18 +257,22 @@ class NpmEcosystem(Ecosystem):
                     continue
                 key = (name, version)
                 if key not in packages:
-                    # Empty chain means this is a top-level installation —
+                    # Empty chain means this is a top-level installation --
                     # report it as a principal. Anything deeper gets the
                     # ancestor path (immediate parent first, principal last)
                     # as its via_chain.
                     via_chain: tuple[str, ...] = tuple(reversed(chain))
                     owners = tuple(sorted(ownership.get(key, set())))
+                    install_groups = tuple(
+                        sorted(groups_by_install.get(key, set()), key=lambda g: g.value)
+                    )
                     packages[key] = InstalledPackage(
                         name=name,
                         version=version,
                         ecosystem=self.kind,
                         via_chain=via_chain,
                         member_owners=owners,
+                        groups=install_groups,
                     )
                 collect(info, chain + (name,))
 

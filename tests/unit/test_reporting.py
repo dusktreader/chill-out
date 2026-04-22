@@ -14,7 +14,7 @@ from chill_out.reporting import render_thresholds
 from rich.console import Console
 
 _DEFAULT_CFG = CooldownConfig(
-    days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5}
+    cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5}
 )
 render_report = functools.partial(_render_report, config=_DEFAULT_CFG)
 
@@ -28,7 +28,7 @@ def _capture(fn, *args, **kwargs) -> str:
 
 class TestRenderThresholds:
     def test_lists_all_release_types(self) -> None:
-        cfg = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
+        cfg = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         out = _capture(render_thresholds, cfg)
         for rel_type in ("major", "minor", "patch", "default"):
             assert rel_type in out

@@ -14,7 +14,7 @@ from chill_out.config import load_config
 from chill_out.constants import EcosystemKind, ExitCode
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.exceptions import handle_errors
-from chill_out.reporting import render_report, render_thresholds
+from chill_out.reporting import render_include_groups, render_report, render_thresholds
 from chill_out.runner import check_async, plan_fixes_async
 from chill_out.version import get_version
 
@@ -105,6 +105,7 @@ def check(
 
     if not quiet:
         render_thresholds(config, console)
+        render_include_groups(config, console)
         console.print()
 
     console.print(f"Checking [bold]{eco.kind.value}[/bold] project at [dim]{root}[/dim]")
@@ -247,3 +248,4 @@ def show_config(
     config = load_config(root, eco.kind)
     console.print(f"Resolved config for [bold]{eco.kind.value}[/bold] at [dim]{root}[/dim]")
     render_thresholds(config, console)
+    render_include_groups(config, console)

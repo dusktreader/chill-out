@@ -23,7 +23,7 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 
-from chill_out.constants import EcosystemKind
+from chill_out.constants import DependencyGroup, EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
 from chill_out.models import (
@@ -143,18 +143,29 @@ class PypiEcosystem(Ecosystem):
             return self._load_from_lock(direct_specs)
         return self._resolve_direct(direct_specs)
 
-    def _read_direct_specs(self) -> dict[str, str]:
+    def _read_direct_specs(self) -> dict[str, tuple[str, set[DependencyGroup]]]:
         """
-        Return a map of ``normalized_name -> raw_spec_string`` for every direct
-        dependency declared in pyproject.toml.
+        Return a map of ``normalized_name -> (raw_spec_string, groups)`` for
+        every direct dependency declared in pyproject.toml.
+
+        Group attribution mirrors the conventional pypi layout:
+
+        * ``[project.dependencies]`` -> :attr:`DependencyGroup.MAIN`
+        * ``[dependency-groups.dev]`` and
+          ``[project.optional-dependencies.dev]`` -> :attr:`DependencyGroup.DEV`
+        * Every other ``[project.optional-dependencies.*]`` extra and every
+          other ``[dependency-groups.*]`` group -> :attr:`DependencyGroup.OPTIONAL`
+
+        A package declared in more than one section accumulates every
+        matching group.
         """
         path = self.root / "pyproject.toml"
         EcosystemError.require_condition(path.is_file(), f"No pyproject.toml at {path}")
         doc = tomlkit.parse(path.read_text())
 
-        specs: dict[str, str] = {}
+        specs: dict[str, tuple[str, set[DependencyGroup]]] = {}
 
-        def absorb(items: Any) -> None:
+        def absorb(items: Any, group: DependencyGroup) -> None:
             if not items:
                 return
             for raw in items:
@@ -163,22 +174,31 @@ class PypiEcosystem(Ecosystem):
                 except InvalidRequirement:
                     logger.warning(f"Skipping unparsable requirement: {raw!r}")
                     continue
-                specs[_normalize(req.name)] = str(raw)
+                normalized = _normalize(req.name)
+                existing = specs.get(normalized)
+                if existing is None:
+                    specs[normalized] = (str(raw), {group})
+                else:
+                    existing[1].add(group)
 
         project = doc.get("project", {})
         if isinstance(project, dict):
-            absorb(project.get("dependencies"))
-            for extras in (project.get("optional-dependencies") or {}).values():
-                absorb(extras)
+            absorb(project.get("dependencies"), DependencyGroup.MAIN)
+            for extra_name, extras in (project.get("optional-dependencies") or {}).items():
+                group = DependencyGroup.DEV if str(extra_name) == "dev" else DependencyGroup.OPTIONAL
+                absorb(extras, group)
 
         groups = doc.get("dependency-groups", {})
         if isinstance(groups, dict):
-            for items in groups.values():
-                absorb(items)
+            for group_name, items in groups.items():
+                semantic = DependencyGroup.DEV if str(group_name) == "dev" else DependencyGroup.OPTIONAL
+                absorb(items, semantic)
 
         return specs
 
-    def _resolve_direct(self, direct_specs: dict[str, str]) -> list[InstalledPackage]:
+    def _resolve_direct(
+        self, direct_specs: dict[str, tuple[str, set[DependencyGroup]]]
+    ) -> list[InstalledPackage]:
         """
         Pair each direct dep with the version that uv resolved for it in the lockfile.
 
@@ -187,7 +207,7 @@ class PypiEcosystem(Ecosystem):
         """
         lock_versions = self._read_lock_versions()
         out: list[InstalledPackage] = []
-        for normalized, raw in direct_specs.items():
+        for normalized, (raw, dep_groups) in direct_specs.items():
             version = lock_versions.get(normalized)
             if version is None:
                 version = _extract_pinned_version(raw)
@@ -199,14 +219,24 @@ class PypiEcosystem(Ecosystem):
                     name=normalized,
                     version=version,
                     ecosystem=self.kind,
+                    groups=tuple(sorted(dep_groups, key=lambda g: g.value)),
                 )
             )
         return out
 
-    def _load_from_lock(self, direct_specs: dict[str, str]) -> list[InstalledPackage]:
+    def _load_from_lock(
+        self, direct_specs: dict[str, tuple[str, set[DependencyGroup]]]
+    ) -> list[InstalledPackage]:
         """
-        Enumerate every package in uv.lock, attributing each transitive dep to a
-        principal direct dependency via reverse-graph BFS.
+        Enumerate every package in uv.lock, attributing each transitive dep to
+        a principal direct dependency via reverse-graph BFS.
+
+        Group attribution for transitives follows the same union semantic as
+        npm's deep mode: forward-walk the dependency graph from each
+        principal and tag every reachable package with that principal's
+        groups. Transitives reached through multiple principals accumulate
+        the union, matching the runner's "included if reachable through any
+        included group" rule.
         """
         lock_path = self.root / "uv.lock"
         EcosystemError.require_condition(
@@ -258,17 +288,37 @@ class PypiEcosystem(Ecosystem):
                         queue.append(parent)
             return ()
 
+        # Forward-walk from each principal to attribute groups to every
+        # reachable transitive. Done as a per-principal BFS so each starting
+        # group label propagates independently and the union accumulates
+        # naturally.
+        groups_by_pkg: dict[str, set[DependencyGroup]] = {}
+        for principal_name, (_, dep_groups) in direct_specs.items():
+            visited = {principal_name}
+            queue = [principal_name]
+            while queue:
+                node = queue.pop(0)
+                groups_by_pkg.setdefault(node, set()).update(dep_groups)
+                for child in deps_by_name.get(node, ()):
+                    if child not in visited:
+                        visited.add(child)
+                        queue.append(child)
+
         out: list[InstalledPackage] = []
         for name, version in version_by_name.items():
             if not version:
                 continue
             via_chain = () if name in principals else find_via_chain(name)
+            pkg_groups = tuple(
+                sorted(groups_by_pkg.get(name, set()), key=lambda g: g.value)
+            )
             out.append(
                 InstalledPackage(
                     name=name,
                     version=version,
                     ecosystem=self.kind,
                     via_chain=via_chain,
+                    groups=pkg_groups,
                 )
             )
         return out

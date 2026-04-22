@@ -9,7 +9,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 from chill_out.config import CooldownConfig
-from chill_out.constants import ReleaseType
+from chill_out.constants import DependencyGroup, ReleaseType
 from chill_out.cooldown import release_type
 from chill_out.models import CheckReport, InstalledPackage, Violation
 
@@ -36,6 +36,31 @@ def render_thresholds(config: CooldownConfig, console: Console) -> None:
     console.print(table)
 
 
+def render_include_groups(config: CooldownConfig, console: Console) -> None:
+    """Print the configured ``include_groups`` as a single-line list.
+
+    Empty configurations are rendered explicitly so it's obvious that
+    nothing will be checked, rather than the line being silently dropped.
+    """
+    if not config.include_groups:
+        console.print("[yellow]Included groups: (none -- nothing will be checked)[/yellow]")
+        return
+    label = ", ".join(g.value for g in config.include_groups)
+    console.print(f"Included groups: [bold]{label}[/bold]")
+
+
+def _fmt_groups(groups: tuple[DependencyGroup, ...]) -> str:
+    """Render a compact ``[group, group]`` suffix, or empty when nothing to show.
+
+    The leading space is included so callers can always concatenate the
+    return value without conditionally inserting separators.
+    """
+    if not groups:
+        return ""
+    label = ", ".join(g.value for g in groups)
+    return f" [dim]\\[{label}][/dim]"
+
+
 def _fmt_pkg_node(name: str, version: str | None, age_days: int | None = None) -> str:
     """Render a package label for a non-violating tree node.
 
@@ -53,12 +78,15 @@ def _fmt_violating_pkg_node(violation: Violation) -> str:
     """Render the package label for the violating leaf row.
 
     Uses the release-type color on the version and calls out the age vs limit
-    in red so the violation reads at a glance.
+    in red so the violation reads at a glance. Includes the package's group
+    membership when known so the reader can spot at a glance whether the
+    violation is in a main, dev, or optional dependency.
     """
     color = _RELEASE_COLOR.get(violation.release_type, "white")
     return (
         f"[bold]{violation.name}[/bold] = [{color}]{violation.version}[/{color}]"
         f" [red](age {violation.age_days}d > {violation.limit_days}d)[/red]"
+        f"{_fmt_groups(violation.package.groups)}"
     )
 
 
@@ -81,7 +109,9 @@ def _build_pkg_tree(
     principal_name = chain_top_down[0]
     principal_pkg = installed_index.get(principal_name)
     principal_version = principal_pkg.version if principal_pkg else None
-    tree = Tree(_fmt_pkg_node(principal_name, principal_version), guide_style="dim")
+    principal_groups = principal_pkg.groups if principal_pkg else ()
+    principal_label = _fmt_pkg_node(principal_name, principal_version) + _fmt_groups(principal_groups)
+    tree = Tree(principal_label, guide_style="dim")
     node = tree
     for intermediate in chain_top_down[1:]:
         ipkg = installed_index.get(intermediate)

@@ -1,15 +1,15 @@
 # Configuration
 
-`chill-out` resolves its cooldown thresholds from up to four sources, layered
-in priority order. Each source can supply a partial mapping; missing keys
+`chill-out` resolves its configuration from up to four sources, layered in
+priority order. Each source can supply a partial mapping; missing keys
 cascade down through the remaining sources until they hit the built-in
 defaults.
 
 | Priority | Source                                | Used for                                         |
 |----------|---------------------------------------|--------------------------------------------------|
 | 1        | `.chill-out.yaml` (or `.chill-out.yml`) | Project-wide override; checked in to the repo. |
-| 2        | `[tool.chill-out.cooldown]` in `pyproject.toml`, or `"chill-out"` in `package.json` | Reuses the project's primary manifest. |
-| 3        | `.github/dependabot.yml` (matching ecosystem) | Reuses your Dependabot policy.            |
+| 2        | `[tool.chill-out]` in `pyproject.toml`, or `"chill-out"` in `package.json` | Reuses the project's primary manifest. |
+| 3        | `.github/dependabot.yml` (matching ecosystem) | Reuses your Dependabot policy (cooldown only). |
 | 4        | Built-in defaults                       | Sensible fallback if nothing else applies.       |
 
 The "primary manifest" tier picks whichever file the project already has. A
@@ -17,6 +17,12 @@ Python project supplies the table in `pyproject.toml`; an npm project supplies
 it in `package.json`. The two slots sit at the same priority, so a project
 that somehow ships both will see the npm key win on a tie (`package.json` is
 loaded last among the manifest sources).
+
+`chill-out` exposes two independent settings: per release-type cooldown
+thresholds, and the set of dependency groups to check. The two are merged
+separately when sources layer: thresholds merge key-by-key, while
+`include_groups` is taken wholesale from the highest-priority source that
+supplies it.
 
 
 ## Threshold values
@@ -34,6 +40,35 @@ Release type is decided by parsing the version with semver. Pre-release versions
 are skipped during the safe-version search.
 
 
+## Included dependency groups
+
+By default `chill-out` checks only the project's main runtime dependencies.
+Dev tooling, optional extras, and peer dependencies stay out of the cooldown
+check unless you opt them in explicitly. The reasoning: a dev-only test
+runner that ships a fresh release on Monday rarely warrants blocking your
+CI on Tuesday, but a runtime dependency that does so is exactly the supply
+chain risk `chill-out` is built to mitigate.
+
+The list is configured under the top-level `include_groups` key, valid in
+all source types. It accepts any combination of these semantic group names:
+
+| Name       | npm equivalent           | pypi equivalent                                                         |
+|------------|--------------------------|-------------------------------------------------------------------------|
+| `main`     | `dependencies`           | `[project.dependencies]`                                                |
+| `dev`      | `devDependencies`        | `[dependency-groups.dev]` and `[project.optional-dependencies.dev]`     |
+| `optional` | `optionalDependencies`   | every other `[project.optional-dependencies.*]` extra and `[dependency-groups.*]` group |
+| `peer`     | `peerDependencies`       | (unused; PyPI has no equivalent)                                        |
+
+The default is `["main"]`. Set `include_groups: []` to check nothing
+(useful for temporarily disabling the check without removing the config).
+
+A package declared in more than one section accumulates every matching
+group; transitive dependencies inherit the union of the groups of every
+top-level dependency that pulls them in. A transitive reachable through
+both `main` and `dev` is included whenever either group is in
+`include_groups`.
+
+
 ## Examples
 
 
@@ -48,15 +83,20 @@ cooldown:
   minor: 14
   patch: 7
   default: 7
+include_groups:
+  - main
+  - dev
 ```
 
 
 ### `pyproject.toml`
 
-If you'd rather not add another config file, add a `[tool.chill-out.cooldown]`
-table:
+If you'd rather not add another config file, add a `[tool.chill-out]` table:
 
 ```toml
+[tool.chill-out]
+include_groups = ["main", "dev"]
+
 [tool.chill-out.cooldown]
 major = 60
 minor = 14
@@ -76,6 +116,7 @@ pyproject shapes:
   "name": "my-app",
   "version": "1.0.0",
   "chill-out": {
+    "include_groups": ["main", "peer"],
     "cooldown": {
       "major": 60,
       "minor": 14,
@@ -86,8 +127,8 @@ pyproject shapes:
 }
 ```
 
-A flat map under `"chill-out"` is also accepted, in case you find the nested
-key noisy for one-off configs.
+A flat map under `"chill-out"` is also accepted for the cooldown fields, in
+case you find the nested key noisy for one-off configs.
 
 
 ### Dependabot reuse
@@ -110,7 +151,8 @@ updates:
 ```
 
 `chill-out` filters by `package-ecosystem`: npm entries feed npm checks, pip
-entries feed Python checks.
+entries feed Python checks. Dependabot doesn't have a concept of dependency
+group filtering, so this source only ever supplies cooldown thresholds.
 
 
 ## Inspecting the resolved config
@@ -121,5 +163,5 @@ When you're not sure which source won, ask:
 chill-out show-config
 ```
 
-The output is the same threshold table that `check` prints at the top of its
-report.
+The output is the same threshold table and group list that `check` prints
+at the top of its report.

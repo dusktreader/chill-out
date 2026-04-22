@@ -491,3 +491,76 @@ class TestPypiApplyFixesRouting:
         assert override_mock.call_args.args[0] == [override]
         assert any("plain" in line for line in log)
         assert any("urllib3" in line for line in log)
+
+
+class TestPypiEcosystemGroupAttribution:
+    """Direct and deep loaders attach semantic groups based on the pyproject.toml section."""
+
+    def test_direct_attributes_main_dev_optional(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="x"\nversion="0"\n'
+            'dependencies = ["main-dep==1.0"]\n'
+            "[project.optional-dependencies]\n"
+            'dev = ["dev-extra==2.0"]\n'
+            'aws = ["aws-extra==3.0"]\n'
+            "[dependency-groups]\n"
+            'dev = ["dev-tool==4.0"]\n'
+            'docs = ["docs-tool==5.0"]\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        pkgs = {p.name: p for p in eco.load_installed(deep=False)}
+        assert pkgs["main-dep"].groups == (DependencyGroup.MAIN,)
+        # The literal extras name "dev" maps to DEV; everything else is OPTIONAL.
+        assert pkgs["dev-extra"].groups == (DependencyGroup.DEV,)
+        assert pkgs["aws-extra"].groups == (DependencyGroup.OPTIONAL,)
+        # The literal dependency-groups name "dev" maps to DEV; others map to OPTIONAL.
+        assert pkgs["dev-tool"].groups == (DependencyGroup.DEV,)
+        assert pkgs["docs-tool"].groups == (DependencyGroup.OPTIONAL,)
+
+    def test_direct_unions_groups_when_listed_in_multiple_sections(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="x"\nversion="0"\n'
+            'dependencies = ["shared==1"]\n'
+            "[dependency-groups]\n"
+            'dev = ["shared==1"]\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        pkgs = {p.name: p for p in eco.load_installed(deep=False)}
+        assert pkgs["shared"].groups == (DependencyGroup.DEV, DependencyGroup.MAIN)
+
+    def test_deep_propagates_groups_to_transitives(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="root"\nversion="0"\n'
+            'dependencies = ["main-dep==1.0"]\n'
+            "[dependency-groups]\n"
+            'dev = ["dev-tool==2.0"]\n'
+        )
+        # Hand-crafted uv.lock with two principals that each pull in their own
+        # transitive plus a shared one.
+        (tmp_path / "uv.lock").write_text(
+            "version = 1\n\n"
+            '[[package]]\nname = "main-dep"\nversion = "1.0"\n'
+            "dependencies = [\n"
+            '  { name = "shared-lib" },\n'
+            "]\n\n"
+            '[[package]]\nname = "dev-tool"\nversion = "2.0"\n'
+            "dependencies = [\n"
+            '  { name = "shared-lib" },\n'
+            '  { name = "dev-only-lib" },\n'
+            "]\n\n"
+            '[[package]]\nname = "shared-lib"\nversion = "0.5"\n\n'
+            '[[package]]\nname = "dev-only-lib"\nversion = "9.0"\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        pkgs = {p.name: p for p in eco.load_installed(deep=True)}
+        assert pkgs["main-dep"].groups == (DependencyGroup.MAIN,)
+        assert pkgs["dev-tool"].groups == (DependencyGroup.DEV,)
+        assert pkgs["dev-only-lib"].groups == (DependencyGroup.DEV,)
+        # Shared transitive accumulates both groups (sorted alphabetically by enum value).
+        assert pkgs["shared-lib"].groups == (DependencyGroup.DEV, DependencyGroup.MAIN)

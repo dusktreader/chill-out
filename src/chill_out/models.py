@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pendulum
 
-from chill_out.constants import ReleaseType, EcosystemKind
+from chill_out.constants import DependencyGroup, ReleaseType, EcosystemKind
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,22 @@ class InstalledPackage:
     More than one entry means the version is shared across siblings -- a
     direct pin in any single member's manifest may not dislodge it because
     the others still need it.
+    """
+
+    groups: tuple[DependencyGroup, ...] = ()
+    """
+    Semantic groups this installation belongs to.
+
+    For principals (``via_chain`` empty), this is the set of declaration
+    sections the package appears in (a package can be listed in more than
+    one section, e.g. both ``dependencies`` and ``peerDependencies``).
+    For transitives, this is the union of the groups of every top-level
+    dependency that pulls the install into the tree, matching the
+    "included if reachable through any included group" semantic the
+    runner uses to decide which packages to check.
+
+    Empty tuple means the ecosystem backend didn't attribute the
+    install to any group (treated as "unknown" -- always included).
     """
 
     @property

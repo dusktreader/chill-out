@@ -713,3 +713,118 @@ class TestNpmListAtWorkspaceRoot:
         assert result == {"dependencies": {}}
         # cwd should be the workspace root, not the member
         assert run.call_args.kwargs["cwd"] == tmp_path
+
+
+class TestNpmEcosystemGroupAttribution:
+    """Direct and deep loaders both attach semantic groups based on the package.json section."""
+
+    def test_direct_attributes_group_per_section(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {
+                "name": "app",
+                "dependencies": {"runtime-dep": "^1.0.0"},
+                "devDependencies": {"test-tool": "^2.0.0"},
+                "peerDependencies": {"plugin-host": "^3.0.0"},
+                "optionalDependencies": {"nice-to-have": "^4.0.0"},
+            },
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake = {
+            "dependencies": {
+                "runtime-dep": {"version": "1.0.0"},
+                "test-tool": {"version": "2.0.0"},
+                "plugin-host": {"version": "3.0.0"},
+                "nice-to-have": {"version": "4.0.0"},
+            }
+        }
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake):
+            pkgs = {p.name: p for p in eco.load_installed(deep=False)}
+        assert pkgs["runtime-dep"].groups == (DependencyGroup.MAIN,)
+        assert pkgs["test-tool"].groups == (DependencyGroup.DEV,)
+        assert pkgs["plugin-host"].groups == (DependencyGroup.PEER,)
+        assert pkgs["nice-to-have"].groups == (DependencyGroup.OPTIONAL,)
+
+    def test_direct_unions_groups_when_listed_in_multiple_sections(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {
+                "name": "app",
+                "dependencies": {"shared": "^1.0.0"},
+                "peerDependencies": {"shared": "^1.0.0"},
+            },
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake = {"dependencies": {"shared": {"version": "1.0.0"}}}
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake):
+            pkgs = eco.load_installed(deep=False)
+        # Both groups are attached, sorted by enum value (alphabetical).
+        assert pkgs[0].groups == (DependencyGroup.MAIN, DependencyGroup.PEER)
+
+    def test_deep_propagates_top_level_group_to_transitives(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {
+                "name": "app",
+                "dependencies": {"runtime-dep": "^1"},
+                "devDependencies": {"test-tool": "^2"},
+            },
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake = {
+            "dependencies": {
+                "runtime-dep": {
+                    "version": "1.0.0",
+                    "dependencies": {"shared-lib": {"version": "0.5.0"}},
+                },
+                "test-tool": {
+                    "version": "2.0.0",
+                    "dependencies": {"test-only-lib": {"version": "9.0.0"}},
+                },
+            }
+        }
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake):
+            with patch.object(NpmEcosystem, "_npm_list_at_workspace_root", return_value=None):
+                with patch.object(NpmEcosystem, "_find_workspace_member", return_value=None):
+                    pkgs = {p.name: p for p in eco.load_installed(deep=True)}
+        assert pkgs["runtime-dep"].groups == (DependencyGroup.MAIN,)
+        assert pkgs["shared-lib"].groups == (DependencyGroup.MAIN,)
+        assert pkgs["test-tool"].groups == (DependencyGroup.DEV,)
+        assert pkgs["test-only-lib"].groups == (DependencyGroup.DEV,)
+
+    def test_deep_unions_groups_when_transitive_reachable_through_multiple(self, tmp_path: Path) -> None:
+        from chill_out.constants import DependencyGroup
+
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {
+                "name": "app",
+                "dependencies": {"runtime-dep": "^1"},
+                "devDependencies": {"test-tool": "^2"},
+            },
+        )
+        eco = NpmEcosystem(tmp_path)
+        # Both top-levels pull in `shared-lib` at the same version.
+        fake = {
+            "dependencies": {
+                "runtime-dep": {
+                    "version": "1.0.0",
+                    "dependencies": {"shared-lib": {"version": "0.5.0"}},
+                },
+                "test-tool": {
+                    "version": "2.0.0",
+                    "dependencies": {"shared-lib": {"version": "0.5.0"}},
+                },
+            }
+        }
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake):
+            with patch.object(NpmEcosystem, "_npm_list_at_workspace_root", return_value=None):
+                with patch.object(NpmEcosystem, "_find_workspace_member", return_value=None):
+                    pkgs = {p.name: p for p in eco.load_installed(deep=True)}
+        assert pkgs["shared-lib"].groups == (DependencyGroup.DEV, DependencyGroup.MAIN)
