@@ -1,0 +1,62 @@
+/* Tokyo Night (Night) dark */
+[data-md-color-scheme="slate"] {
+    --md-hue: 237;
+
+    --md-primary-fg-color:             #7aa2f7;
+    --md-primary-fg-color--light:      #b4c6fa;
+    --md-primary-fg-color--dark:       #3d59a1;
+    --md-primary-bg-color:             #16161e;
+    --md-primary-bg-color--light:      #1a1b26;
+
+    --md-accent-fg-color:              #bb9af7;
+    --md-accent-fg-color--transparent: #bb9af720;
+    --md-accent-bg-color:              #16161e;
+
+    --md-default-bg-color:             #1a1b26;
+    --md-default-bg-color--light:      #16161e;
+    --md-default-bg-color--lighter:    #20222c;
+    --md-default-bg-color--lightest:   #2a2b3d;
+
+    --md-default-fg-color:             #a9b1d6;
+    --md-default-fg-color--light:      #787c99;
+    --md-default-fg-color--lighter:    #515670;
+    --md-default-fg-color--lightest:   #363b54;
+
+    --md-code-bg-color:                #16161e;
+    --md-code-fg-color:                #a9b1d6;
+}
+
+/* Tokyo Day light */
+[data-md-color-scheme="default"] {
+    --md-primary-fg-color:             #2e7de9;
+    --md-primary-fg-color--light:      #7aa2f7;
+    --md-primary-fg-color--dark:       #1d4f9e;
+    --md-primary-bg-color:             #e1e2e7;
+    --md-primary-bg-color--light:      #d5d6db;
+
+    --md-accent-fg-color:              #7847bd;
+    --md-accent-fg-color--transparent: #7847bd20;
+    --md-accent-bg-color:              #e1e2e7;
+
+    --md-default-bg-color:             #e1e2e7;
+    --md-default-bg-color--light:      #d5d6db;
+    --md-default-bg-color--lighter:    #cbccd1;
+    --md-default-bg-color--lightest:   #c0c1c7;
+
+    --md-default-fg-color:             #343b58;
+    --md-default-fg-color--light:      #3760bf;
+    --md-default-fg-color--lighter:    #8990b3;
+    --md-default-fg-color--lightest:   #c3c5d4;
+
+    --md-code-bg-color:                #d5d6db;
+    --md-code-fg-color:                #343b58;
+}
+
+/* Nav section headings — use primary color and uppercase to distinguish from items */
+.md-nav__item--section > .md-nav__link {
+    color: var(--md-primary-fg-color);
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}

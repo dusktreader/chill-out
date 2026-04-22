@@ -42,6 +42,7 @@ chill-out check
 - [Quickstart](quickstart.md) walks through running your first check
 - [Configuration](configuration.md) explains how the cooldown thresholds are picked up
 - [Ecosystems](ecosystems.md) describes what each backend does
+- [Comparison](comparison.md) shows where chill-out fits relative to Renovate, Dependabot, and other tools
 - [CLI](cli.md) is the full command reference
 - [Programmatic API](api.md) shows how to use `chill-out` from your own code
 - [Reference](reference.md) is the auto-generated API documentation
