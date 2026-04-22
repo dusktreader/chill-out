@@ -1,0 +1,100 @@
+[project]
+name = "chill-out"
+version = "0.1.0"
+description = "Manage cooldown for package dependencies to avoid zero-day supply chain vulnerabilities"
+authors = [
+    {name = "Tucker Beck", email ="tucker.beck@gmail.com"},
+]
+readme = "README.md"
+license-files = ["LICENSE.md"]
+
+requires-python = ">=3.12, ~=3.14"
+
+dependencies = [
+    "loguru>=0.7",
+    "py-buzz>=8.0",
+    "snick>=3.0",
+    "typer>=0.24.1",
+]
+
+[project.scripts]
+chill-out = "chill_out.cli.main:cli"
+chill_out-demo = "chill_out_demo.main:main"
+
+
+[project.urls]
+homepage = "https://github.com/dusktreader/chill-out"
+source = "https://github.com/dusktreader/chill-out"
+changelog = "https://github.com/dusktreader/chill-out/blob/main/CHANGELOG.md"
+
+
+[project.optional-dependencies]
+demo = [
+    "rich>=14.0",
+    "snick>=3.0",
+    "typer>=0.24.1",
+]
+
+
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8",
+    "ipython>=8.18",
+    "mkdocs-material>=9.6",
+    "mkdocstrings[python]>=0.29",
+    "pyclean>=3.1",
+    "pygments>=2.19",
+    "pytest>=8.3",
+    "pytest-bdd>=7.0",
+    "pytest-cov>=6.0",
+    "pytest-mock>=3.14",
+    "pytest-pretty>=1.2",
+    "pytest-random-order>=1.1",
+    "ruff>=0.11",
+    "ty>=0.0",
+    "typos>=1.31",
+]
+
+
+[tool.uv]
+package = true
+
+
+[tool.pytest.ini_options]
+addopts = [
+    "--random-order",
+    "--cov=src/chill_out",
+    "--cov-report=term-missing",
+    "--cov-fail-under=85",
+    "--cov-report=xml:.coverage.xml",
+    "--junitxml=.junit.xml",
+    "--override-ini=junit_family=legacy",
+]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_steps.py"]
+markers = [
+    "integration: Integration tests that exercise the real package with no mocking",
+    "unit: Fast unit tests with all external dependencies mocked",
+]
+
+[tool.coverage.run]
+omit = ["src/chill_out/main.py"]
+
+
+[tool.ruff]
+line-length = 120
+src = ["src/chill_out", "tests", "src/chill_out_demo", "examples"]
+
+
+[tool.ruff.format]
+docstring-code-format = true
+
+
+[tool.typos.default]
+extend-ignore-identifiers-re = []
+
+
+[build-system]
+requires = ["uv-build>=0.1.0"]
+build-backend = "uv_build"

@@ -1,0 +1,34 @@
+name: Deploy on tag
+run-name: deploy-on-tag
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Set up Python
+      run: uv python install 3.14
+
+    - name: Check Quality
+      run: make qa/full
+
+    - name: Build package
+      run: uv build
+
+    - name: Publish package
+      run: uv publish
