@@ -158,10 +158,11 @@ class TestPlanFixes:
             safe_version=SafeVersion(version="1.5.0", age_days=200),
         )
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
-        actions = plan_fixes(report)
-        assert actions == [FixAction(package="x", version="1.5.0", is_override=False)]
+        plan = plan_fixes(report)
+        assert plan.actions == [FixAction(package="x", version="1.5.0")]
+        assert plan.unfixable == []
 
-    def test_transitive_violation_becomes_override(self, now, config) -> None:
+    def test_transitive_violation_becomes_direct_pin(self, now, config) -> None:
         from chill_out.models import CheckReport, SafeVersion, Violation
 
         v = Violation(
@@ -173,10 +174,11 @@ class TestPlanFixes:
             safe_version=SafeVersion(version="1.5.0", age_days=200),
         )
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
-        actions = plan_fixes(report)
-        assert actions[0].is_override is True
+        plan = plan_fixes(report)
+        assert plan.actions == [FixAction(package="t", version="1.5.0")]
+        assert plan.unfixable == []
 
-    def test_skips_violations_without_safe_version(self, now, config) -> None:
+    def test_records_unfixable_when_no_safe_version(self, now, config) -> None:
         from chill_out.models import CheckReport, Violation
 
         v = Violation(
@@ -188,7 +190,11 @@ class TestPlanFixes:
             safe_version=None,
         )
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
-        assert plan_fixes(report) == []
+        plan = plan_fixes(report)
+        assert plan.actions == []
+        assert len(plan.unfixable) == 1
+        assert plan.unfixable[0].violation is v
+        assert "no safe version" in plan.unfixable[0].reason
 
 
 class TestDedupe:
@@ -247,14 +253,14 @@ class TestPlanFixesAsync:
         v = self._violation("requests", "2.31.0", "2.30.0", via=None)
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
         eco = _FakeEcosystem(packages=[v.package], data={}, manifests={})
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        assert len(actions) == 1
-        assert actions[0].package == "requests"
-        assert actions[0].version == "2.30.0"
-        assert actions[0].is_override is False
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].package == "requests"
+        assert plan.actions[0].version == "2.30.0"
+        assert plan.unfixable == []
 
     @pytest.mark.asyncio
-    async def test_transitive_with_compatible_principal_emits_override_only(
+    async def test_transitive_with_compatible_principal_emits_direct_pin(
         self, now: pendulum.DateTime, config
     ) -> None:
         from chill_out.models import CheckReport, VersionManifest
@@ -272,10 +278,11 @@ class TestPlanFixesAsync:
         }
         eco = _FakeEcosystem(packages=[v.package, principal], data={}, manifests=manifests)
         # Default range_satisfies in _FakeEcosystem returns True.
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        assert len(actions) == 1
-        assert actions[0].package == "child"
-        assert actions[0].is_override is True
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].package == "child"
+        assert plan.actions[0].version == "1.9.0"
+        assert plan.unfixable == []
 
     @pytest.mark.asyncio
     async def test_incompatible_principal_triggers_rollback(self, now: pendulum.DateTime, config) -> None:
@@ -314,17 +321,16 @@ class TestPlanFixesAsync:
             data={"parent": parent_info},
             manifests=manifests,
         )
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        # Two actions: principal install + child override.
-        assert len(actions) == 2
-        by_name = {a.package: a for a in actions}
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        # Two actions: principal rollback + child direct pin.
+        assert len(plan.actions) == 2
+        by_name = {a.package: a for a in plan.actions}
         assert by_name["parent"].version == "1.5.0"
-        assert by_name["parent"].is_override is False
         assert by_name["child"].version == "1.9.0"
-        assert by_name["child"].is_override is True
+        assert plan.unfixable == []
 
     @pytest.mark.asyncio
-    async def test_no_compatible_principal_skips_violation(self, now: pendulum.DateTime, config) -> None:
+    async def test_no_compatible_principal_records_unfixable(self, now: pendulum.DateTime, config) -> None:
         from chill_out.models import CheckReport, VersionManifest
         from chill_out.runner import plan_fixes_async
 
@@ -356,11 +362,15 @@ class TestPlanFixesAsync:
             data={"parent": parent_info},
             manifests=manifests,
         )
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        assert actions == []
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert plan.actions == []
+        assert len(plan.unfixable) == 1
+        reason = plan.unfixable[0].reason
+        assert "conflicts with parent@2.0.0" in reason
+        assert "downgrade parent manually" in reason
 
     @pytest.mark.asyncio
-    async def test_unknown_principal_falls_back_to_override(self, now: pendulum.DateTime, config) -> None:
+    async def test_unknown_principal_falls_back_to_direct_pin(self, now: pendulum.DateTime, config) -> None:
         from chill_out.models import CheckReport
         from chill_out.runner import plan_fixes_async
 
@@ -368,12 +378,14 @@ class TestPlanFixesAsync:
         v = self._violation("child", "2.0.0", "1.9.0", via="ghost")
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
         eco = _FakeEcosystem(packages=[v.package], data={}, manifests={})
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        assert len(actions) == 1
-        assert actions[0].is_override is True
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].package == "child"
+        assert plan.actions[0].version == "1.9.0"
+        assert plan.unfixable == []
 
     @pytest.mark.asyncio
-    async def test_skips_violation_with_no_safe_version(self, now: pendulum.DateTime, config) -> None:
+    async def test_records_unfixable_when_no_safe_version(self, now: pendulum.DateTime, config) -> None:
         from chill_out.models import CheckReport, Violation
         from chill_out.runner import plan_fixes_async
 
@@ -388,5 +400,7 @@ class TestPlanFixesAsync:
         )
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[installed], violations=[v])
         eco = _FakeEcosystem(packages=[installed], data={}, manifests={})
-        actions = await plan_fixes_async(report, eco, config=config, now=now)
-        assert actions == []
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert plan.actions == []
+        assert len(plan.unfixable) == 1
+        assert "no safe version" in plan.unfixable[0].reason

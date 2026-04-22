@@ -18,10 +18,12 @@ from chill_out.exceptions import (
 from chill_out.models import (
     CheckReport,
     FixAction,
+    FixPlan,
     InstalledPackage,
     PackageInfo,
     PackageRelease,
     SafeVersion,
+    UnfixableViolation,
     VersionManifest,
     Violation,
 )
@@ -46,6 +48,7 @@ __all__ = [
     "EcosystemKind",
     "ExitCode",
     "FixAction",
+    "FixPlan",
     "InstalledPackage",
     "NpmEcosystem",
     "PackageInfo",
@@ -53,6 +56,7 @@ __all__ = [
     "PypiEcosystem",
     "RegistryError",
     "SafeVersion",
+    "UnfixableViolation",
     "VersionManifest",
     "Violation",
     "check",

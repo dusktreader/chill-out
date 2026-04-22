@@ -79,9 +79,11 @@ def demo_02_npm_plan_fixes() -> None:
     """
     Show the resulting fix actions for the npm violation.
 
-    Principal violations become direct dependency pins; transitive violations
-    become npm `overrides` entries. Both kinds appear in the same `FixAction`
-    list, distinguished by the `is_override` flag.
+    Every fix is a direct pin in `dependencies`. Transitive violations get
+    promoted to direct entries so the resolver hoists them over whatever the
+    principal asks for. Conflicts that can't be resolved by hoisting trigger
+    a principal rollback handled by `plan_fixes_async`; the synchronous
+    `plan_fixes` here just emits the direct pins.
     """
     _seed_registry()
     with tempfile.TemporaryDirectory() as raw_tmp:
@@ -89,6 +91,8 @@ def demo_02_npm_plan_fixes() -> None:
         _make_npm_project(tmp)
         with patch.object(NpmEcosystem, "_npm_list", return_value=_fake_npm_list()):
             report = asyncio.run(check_async(NpmEcosystem(tmp)))
-    for action in plan_fixes(report):
-        kind = "override" if action.is_override else "dependency"
-        print(f"{kind:10s} {action.package}@{action.version}")
+    plan = plan_fixes(report)
+    for action in plan.actions:
+        print(f"pin {action.package}@{action.version}")
+    for entry in plan.unfixable:
+        print(f"unfixable {entry.violation.name}=={entry.violation.version}: {entry.reason}")

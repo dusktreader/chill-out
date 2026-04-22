@@ -7,8 +7,26 @@ that exercises the whole check + fix pipeline against them.
 
 Both demos mock the registry so they run offline. The chill-out code path is
 the real one: configuration loading, ecosystem detection, transitive
-attribution, cooldown evaluation, principal rollback, and the file edits that
-`--fix` would write are all the production functions, not stand-ins.
+attribution, cooldown evaluation, conflict-aware principal rollback, and the
+file edits that `--fix` would write are all the production functions, not
+stand-ins.
+
+
+## How `--fix` decides what to write
+
+For every violation with a known safe version, chill-out tries the simplest
+thing first: a direct pin in the project's primary manifest
+(`dependencies` for npm, `project.dependencies` for pypi). Direct pins win
+because the resolver hoists them above whatever the principal asks for.
+
+For a transitive violation, the planner first checks whether the installed
+principal's declared range admits the safe transitive. If it does, the direct
+pin is enough. If not, chill-out looks for an older principal whose declared
+range *does* admit the safe transitive, and emits two pins: a rollback of the
+principal and the direct pin of the transitive. If no compatible older
+principal exists the violation lands in `FixPlan.unfixable` with a structured
+reason so the CLI can show actionable guidance instead of silently dropping
+the violation.
 
 
 ## npm: a fresh direct + a fresh transitive
@@ -18,14 +36,12 @@ The fixture lives at `examples/projects/npm-app/`. Its `package.json` declares
 and the demo's mocked registry agree that:
 
 - `chalk@5.4.0` was published two days ago. It is a direct dep, so chill-out
-  will propose pinning it to a safe older release.
+  proposes a direct pin to a safe older release.
 - `lodash.merge@4.6.3` was published two days ago. It is pulled in by `lodash`,
-  and `lodash@4.17.21` declares its merge transitive with a tight `~4.6.3`
-  range. That range does not admit `lodash.merge@4.6.2`, so a plain override
-  would create an install that no version of the principal accepts. Chill-out's
-  principal-rollback path notices, walks back to `lodash@4.17.20` whose
-  declared range does admit `4.6.2`, and emits both the principal pin and the
-  transitive override.
+  and the installed `lodash@4.17.21` declares its merge transitive with a
+  range that does not admit `lodash.merge@4.6.2`. The planner walks back to
+  `lodash@4.17.20`, whose declared range does admit `4.6.2`, and emits both
+  the principal rollback and the transitive pin.
 
 Run it from the repo root:
 
@@ -46,15 +62,15 @@ checked 6 package(s)
       release_type=patch age=2d limit=7d safe=4.6.2
 
 planned fix actions:
-  dependency chalk -> 5.3.0
-  dependency lodash -> 4.17.20
-  override  lodash.merge -> 4.6.2
+  pin chalk -> 5.3.0
+  pin lodash -> 4.17.20
+  pin lodash.merge -> 4.6.2
 
 applying fixes to a temporary copy of the project ...
 apply log:
-  - dependency chalk -> 5.3.0
-  - dependency lodash -> 4.17.20
-  - override lodash.merge -> 4.6.2
+  - pinned chalk -> 5.3.0
+  - pinned lodash -> 4.17.20
+  - pinned lodash.merge -> 4.6.2
   - ran: npm install
 
 resulting package.json:
@@ -65,13 +81,11 @@ resulting package.json:
   "dependencies": {
     "chalk": "5.3.0",
     "express": "^4.19.2",
-    "lodash": "4.17.20"
+    "lodash": "4.17.20",
+    "lodash.merge": "4.6.2"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  },
-  "overrides": {
-    "lodash.merge": "4.6.2"
   }
 }
 ```
@@ -80,13 +94,14 @@ Three things to notice in the resulting manifest:
 
 1. The fresh direct dep (`chalk`) became a hard pin in `dependencies`. The
    caret range was replaced with the exact safe version.
-2. The fresh transitive (`lodash.merge`) became an entry in npm's `overrides`
-   block, so npm will resolve every reference to that name to the safe version
-   regardless of what the parent declares.
+2. The fresh transitive (`lodash.merge`) was promoted to a direct entry in
+   `dependencies`. The npm resolver hoists this entry over whatever the
+   principal asks for.
 3. The principal (`lodash`) was rolled back from `^4.17.21` to a hard pin at
    `4.17.20`, the most recent version whose declared range admits the safe
-   transitive. Without that rollback, npm would complain that the override
-   conflicts with the principal's declared range.
+   transitive. This is the conflict-resolution step: without the rollback,
+   the resolver would either fail or silently disagree about which
+   `lodash.merge` to use.
 
 
 ## Python: principal rollback through a transitive
@@ -99,7 +114,11 @@ The fixture at `examples/projects/python-app/` declares `fastapi`, `httpx`,
 - `anyio==4.3.0` was published two days ago and is pulled in by fastapi. The
   installed `fastapi==0.110.0` declares `anyio>=4.3,<5`, which excludes the
   safe `anyio==4.2.0`. Chill-out rolls fastapi back to `0.109.2`, whose
-  declared `anyio>=3.7.1,<5` admits `4.2.0`, and emits the override.
+  declared `anyio>=3.7.1,<5` admits `4.2.0`, and pins anyio directly.
+
+Without the rollback, `uv lock` would refuse to resolve a pinned
+`anyio==4.2.0` against fastapi's declared `anyio>=4.3,<5`, and the manifest
+edit would leave the project in a half-applied state.
 
 Run it:
 
@@ -120,9 +139,9 @@ checked 9 package(s)
       release_type=minor age=2d limit=14d safe=0.26.0
 
 planned fix actions:
-  pin       fastapi -> 0.109.2
-  override  anyio -> 4.2.0
-  pin       httpx -> 0.26.0
+  pin fastapi -> 0.109.2
+  pin anyio -> 4.2.0
+  pin httpx -> 0.26.0
 
 applying fixes to a temporary copy of the project ...
 apply log:
@@ -144,10 +163,30 @@ dependencies = [
 ]
 ```
 
-The Python ecosystem doesn't have npm-style `overrides`. To pin a transitive
-that was previously implicit, chill-out promotes it to a direct entry in
-`project.dependencies`. After the edit, `uv lock` runs and the lockfile reflects
-the rolled-back fastapi plus the pinned anyio.
+The Python ecosystem doesn't have npm-style `overrides`, so transitive pins
+land as direct entries in `project.dependencies`. After the edit, `uv lock`
+runs and the lockfile reflects the rolled-back fastapi plus the pinned anyio.
+
+
+## When the planner gives up
+
+If a transitive conflict has no compatible older principal (for example, the
+principal first declared the offending range several major versions back), the
+direct pin would still get attempted but the planner records an
+`UnfixableViolation`. The CLI surfaces these explicitly:
+
+```text
+1 violation(s) cannot be auto-fixed:
+  - leftpad==2.0.0: safe version 1.5.0 conflicts with parent@2.0.0
+    (declares leftpad>=2.0), and no older parent release that has cleared
+    its own cooldown declares a range that admits leftpad==1.5.0.
+    Options: downgrade parent manually, raise the safe target for leftpad,
+    or wait out the cooldown.
+```
+
+The reason string lists the three concrete actions a maintainer can take.
+Programmatic callers can iterate `FixPlan.unfixable` and surface the same
+guidance in their own UIs.
 
 
 ## How to copy this for your own project

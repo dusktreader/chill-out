@@ -68,9 +68,9 @@ PACKAGES: dict[str, dict[str, Any]] = {
         },
         "manifests": {
             # Installed fastapi declares a tight anyio range that excludes 4.2.x,
-            # so a plain transitive override would violate the resolver. That
-            # forces principal rollback to an older fastapi whose range admits
-            # anyio==4.2.0.
+            # so a plain transitive direct pin would conflict with the resolver.
+            # That forces principal rollback to an older fastapi whose range
+            # admits anyio==4.2.0.
             "0.110.0": ["anyio>=4.3,<5", "starlette>=0.36,<0.37"],
             "0.109.2": ["anyio>=3.7.1,<5", "starlette>=0.35,<0.37"],
             "0.109.0": ["anyio>=3.7.1,<5", "starlette>=0.35,<0.36"],
@@ -180,11 +180,16 @@ def main() -> None:
 
     print()
     print("planned fix actions:")
-    if not actions:
+    if not actions.actions:
         print("  (none)")
-    for a in actions:
-        kind = "override " if a.is_override else "pin      "
-        print(f"  {kind} {a.package} -> {a.version}")
+    for a in actions.actions:
+        print(f"  pin {a.package} -> {a.version}")
+    if actions.unfixable:
+        print()
+        print("unfixable violations:")
+        for u in actions.unfixable:
+            print(f"  ! {u.violation.name}=={u.violation.version}")
+            print(f"      {u.reason}")
 
     print()
     print("applying fixes to a temporary copy of the project ...")
@@ -193,7 +198,7 @@ def main() -> None:
         shutil.copytree(PROJECT_ROOT, tmp)
         copy_eco = PypiEcosystem(tmp)
         with patch("chill_out.ecosystems.pypi.subprocess.run", side_effect=_fake_subprocess_run):
-            applied = copy_eco.apply_fixes(actions)
+            applied = copy_eco.apply_fixes(actions.actions)
         print("apply log:")
         for line in applied:
             print(f"  - {line}")

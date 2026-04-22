@@ -102,12 +102,36 @@ class Violation:
 
 @dataclass(frozen=True)
 class FixAction:
-    """A single change to apply when running `--fix`."""
+    """A single change to apply when running `--fix`.
+
+    Both direct and transitive violations land in the same shape: a pin of
+    ``package`` to ``version`` written to the project's primary manifest
+    (``project.dependencies`` for pypi, ``dependencies`` for npm). Transitive
+    pins ride along as direct entries; the ecosystem resolver hoists them.
+    """
 
     package: str
     version: str
-    is_override: bool = False
-    """ True if the action should be applied as an override pin (transitive), false for a direct install. """
+
+
+@dataclass(frozen=True)
+class UnfixableViolation:
+    """A violation that ``--fix`` could not auto-resolve.
+
+    Surfaces the structured reason so the CLI can print actionable guidance
+    instead of silently dropping the violation.
+    """
+
+    violation: Violation
+    reason: str
+
+
+@dataclass
+class FixPlan:
+    """The result of planning fixes for a check report."""
+
+    actions: list[FixAction] = field(default_factory=list)
+    unfixable: list[UnfixableViolation] = field(default_factory=list)
 
 
 @dataclass

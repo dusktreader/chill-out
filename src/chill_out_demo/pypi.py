@@ -89,7 +89,9 @@ def demo_02_pypi_plan_fixes() -> None:
         _make_pypi_project(tmp)
         report = asyncio.run(check_async(PypiEcosystem(tmp)))
     actions = plan_fixes(report)
-    print(json.dumps([a.__dict__ for a in actions], indent=2, default=str))
+    print(json.dumps({"actions": [a.__dict__ for a in actions.actions], "unfixable": [
+        {"package": u.violation.name, "version": u.violation.version, "reason": u.reason} for u in actions.unfixable
+    ]}, indent=2, default=str))
 
 
 @respx.mock

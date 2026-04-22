@@ -8,8 +8,8 @@ intentionally constructed so a deep check finds two violations:
 - `lodash.merge@4.6.3` is a fresh transitive of `lodash`. The installed
   `lodash@4.17.21` declares its merge transitive with a tight range that
   doesn't admit `4.6.2`, so chill-out's principal-rollback path picks an
-  older `lodash` whose declared range does and emits the override along with
-  the principal pin.
+  older `lodash` whose declared range does and emits both the principal pin
+  and the transitive pin as direct entries.
 
 Run the demo from the repository root:
 

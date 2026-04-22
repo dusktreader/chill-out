@@ -32,8 +32,8 @@ bash examples/cli_check.sh
 
 | Project                        | Ecosystem | Walkthrough                                          |
 |--------------------------------|-----------|------------------------------------------------------|
-| `projects/npm-app/`            | npm       | direct pin + principal rollback with overrides       |
-| `projects/python-app/`         | pypi      | direct pin + principal rollback with overrides       |
+| `projects/npm-app/`            | npm       | direct pin + principal rollback on conflict          |
+| `projects/python-app/`         | pypi      | direct pin + principal rollback on conflict          |
 
 Each project has a real `package.json` / `pyproject.toml`, a lockfile, a
 `.chill-out.yaml` config, and a `run_demo.py` that mocks the registry and

@@ -216,11 +216,16 @@ def main() -> None:
 
     print()
     print("planned fix actions:")
-    if not actions:
+    if not actions.actions:
         print("  (none)")
-    for a in actions:
-        kind = "override " if a.is_override else "dependency"
-        print(f"  {kind} {a.package} -> {a.version}")
+    for a in actions.actions:
+        print(f"  pin {a.package} -> {a.version}")
+    if actions.unfixable:
+        print()
+        print("unfixable violations:")
+        for u in actions.unfixable:
+            print(f"  ! {u.violation.name}=={u.violation.version}")
+            print(f"      {u.reason}")
 
     # Apply the fixes against a copy so the fixture on disk stays pristine.
     print()
@@ -230,7 +235,7 @@ def main() -> None:
         shutil.copytree(PROJECT_ROOT, tmp)
         copy_eco = NpmEcosystem(tmp)
         with patch("chill_out.ecosystems.npm.subprocess.run", side_effect=_fake_subprocess_run):
-            applied = copy_eco.apply_fixes(actions)
+            applied = copy_eco.apply_fixes(actions.actions)
         print("apply log:")
         for line in applied:
             print(f"  - {line}")

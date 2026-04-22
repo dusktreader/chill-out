@@ -9,7 +9,7 @@ constructed so a deep check finds two violations:
   `fastapi==0.110.0` declares `anyio>=4.3,<5`, which excludes the safe
   `anyio==4.2.0`. Chill-out's principal-rollback path picks an older fastapi
   (`0.109.2`) whose declared range admits `4.2.0`, then emits both the
-  principal pin and the transitive override.
+  principal pin and a direct pin of anyio.
 
 Run the demo from the repository root:
 

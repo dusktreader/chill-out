@@ -36,8 +36,11 @@ workspace root.
 
 `--fix` writes safe versions into the root `package.json`:
 
-- principal violations go into `dependencies`
-- transitive violations go into `overrides`
+- both principal and transitive violations land as direct entries in
+  `dependencies` (the npm resolver hoists transitive pins above whatever the
+  principal asks for)
+- transitive conflicts that would put the resolver at odds with the principal
+  trigger a principal rollback alongside the transitive pin
 
 After editing, the backend runs `npm install` once to rewrite the lockfile.
 

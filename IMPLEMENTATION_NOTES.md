@@ -72,27 +72,35 @@ settings.
 
 For PyPI projects, `--fix` edits `pyproject.toml` in place using `tomlkit`
 (which preserves comments and formatting), then runs `uv lock` to refresh
-the lockfile. For npm, it adds `overrides` entries to `package.json` for
-transitive deps and runs `npm install` to refresh `package-lock.json`.
+the lockfile. For npm, it pins each violating dep as a direct entry in
+`dependencies` (transitive pins ride along as direct entries; the resolver
+hoists them above the principal's declared range) and runs `npm install`
+to refresh `package-lock.json`. This matches the upstream
+`check-dep-cooldown.py` script, which dropped its `overrides` write path
+after running into npm's workspace-hoisting unreliability.
 
-### Principal rollback
+### Conflict-aware principal rollback
 
-When a transitive dependency is in cooldown, the simple fix is to pin the
-transitive to an older safe version via an override. That works as long as
-the principal package's declared range still admits the safe version. When
-it doesn't, the override either silently lies (npm) or breaks the lock
-resolution (pip / uv).
+When a transitive dependency is in cooldown, the simple fix is a direct pin
+of the safe transitive in the project's primary manifest. That works as long
+as the principal's declared range admits the safe version. When it doesn't,
+npm silently disagrees about which copy to load and pip / uv refuse to
+resolve at all.
 
-The fix planner handles this in `plan_fixes_async`:
+The fix planner handles this in `plan_fixes_async` and returns a structured
+`FixPlan(actions, unfixable)`:
 
-1. Look up the principal's installed version in the report.
-2. Fetch its manifest from the registry.
-3. If the declared range for the transitive already accepts the safe
-   version, emit just the override.
-4. Otherwise, walk older principal versions (out of cooldown, prereleases
-   skipped) and pick the newest one whose declared range *does* admit the
-   safe transitive. Emit two actions: install that older principal, and
-   override the transitive.
+1. **Direct violation:** emit a direct pin. Done.
+2. **Transitive, principal range admits the safe version:** emit a direct
+   pin and trust the resolver to hoist it. Done.
+3. **Transitive, principal range conflicts:** walk older principal versions
+   (out of cooldown, prereleases skipped) and pick the newest one whose
+   declared range admits the safe transitive. Emit two actions: a pin of
+   the older principal, and a direct pin of the transitive.
+4. **No compatible older principal:** record the violation in
+   `FixPlan.unfixable` with a structured reason listing the maintainer's
+   options (downgrade the principal manually, raise the safe target, or
+   wait out the cooldown).
 
 The range check is delegated to the ecosystem via `Ecosystem.range_satisfies`.
 The npm implementation shells out to `node -e "require('semver').satisfies(...)"`,
@@ -101,8 +109,14 @@ matching the original script. The PyPI implementation uses
 be parsed, mirroring the original's "assume compatible if we can't tell"
 behavior.
 
-When no compatible older principal exists, the planner skips the violation
-with a warning rather than emitting a doomed action.
+The upstream npm-only script dropped principal rollback because npm tolerates
+the conflict (the resolver doesn't error out on a hoisted pin that disagrees
+with a parent's declared range). We kept rollback because pypi doesn't
+tolerate it: `uv lock` will refuse to resolve a pinned `anyio==4.2.0` against
+fastapi's declared `anyio>=4.3,<5`, and the manifest edit would leave the
+project in a half-applied state. Keeping rollback as the conflict-resolution
+fallback gives both ecosystems the same shape: try the simple thing, fall
+back to the principled thing only when the simple thing won't resolve.
 
 ### Registry caching
 

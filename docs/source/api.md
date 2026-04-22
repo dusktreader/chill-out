@@ -33,9 +33,11 @@ from chill_out import PypiEcosystem, check_async, plan_fixes
 async def main() -> None:
     eco = PypiEcosystem(Path.cwd())
     report = await check_async(eco, deep=True, fast=False)
-    for action in plan_fixes(report):
-        kind = "override" if action.is_override else "dependency"
-        print(f"{kind}: {action.package} -> {action.version}")
+    plan = plan_fixes(report)
+    for action in plan.actions:
+        print(f"pin {action.package} -> {action.version}")
+    for entry in plan.unfixable:
+        print(f"unfixable {entry.violation.name}=={entry.violation.version}: {entry.reason}")
 
 asyncio.run(main())
 ```
@@ -44,14 +46,19 @@ asyncio.run(main())
 connection pool with the rest of your application.
 
 
-## Planning fixes with principal rollback
+## Planning fixes with conflict-aware rollback
 
-`plan_fixes(report)` returns the simple set of overrides and pins. When a
-transitive dep is in cooldown but its principal's declared range can't admit
-the safe transitive, that override would either silently lie (npm) or break
-the resolver (pip / uv). `plan_fixes_async` handles those cases by walking
-older principal versions for one whose range *does* admit the safe
-transitive, and emitting both a principal install and a transitive override.
+`plan_fixes(report)` returns a `FixPlan` with a flat list of direct pins and a
+list of `UnfixableViolation` entries. Both lists may be empty.
+
+For transitive violations the synchronous form just emits a direct pin and
+trusts the resolver to hoist it. That works for npm, but pip and uv refuse to
+resolve a pin that falls outside the principal's declared range. The async
+form `plan_fixes_async` handles those cases by walking older principal
+versions for one whose declared range *does* admit the safe transitive, and
+emitting both a principal rollback and the transitive pin. When no compatible
+older principal exists, the violation lands in `FixPlan.unfixable` with a
+structured reason that lists the maintainer's options.
 
 ```python
 import asyncio
@@ -64,10 +71,12 @@ async def main() -> None:
     eco = PypiEcosystem(Path.cwd())
     async with httpx.AsyncClient() as http:
         report = await check_async(eco, http=http)
-        actions = await plan_fixes_async(report, eco, http=http)
-    for action in actions:
-        kind = "override" if action.is_override else "install"
-        print(f"{kind}: {action.package} -> {action.version}")
+        plan = await plan_fixes_async(report, eco, http=http)
+    for action in plan.actions:
+        print(f"pin {action.package} -> {action.version}")
+    for entry in plan.unfixable:
+        print(f"  ! {entry.violation.name}=={entry.violation.version}")
+        print(f"    {entry.reason}")
 
 asyncio.run(main())
 ```

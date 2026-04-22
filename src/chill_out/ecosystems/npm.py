@@ -3,8 +3,8 @@ npm ecosystem backend.
 
 Reads installed packages from ``npm list --json`` and from ``package-lock.json``
 for transitive resolution. Talks to the npm registry. Applies fixes by editing
-``package.json`` (overrides for transitive pins, dependencies for direct pins)
-and re-running ``npm install``.
+the root ``package.json`` to pin every safe version (direct or promoted-from-
+transitive) into ``dependencies``, then re-running ``npm install``.
 """
 
 from __future__ import annotations
@@ -279,22 +279,14 @@ class NpmEcosystem(Ecosystem):
         EcosystemError.require_condition(root_pkg_path.is_file(), f"No package.json at project root: {root_pkg_path}")
 
         root_pkg = json.loads(root_pkg_path.read_text())
-        overrides = root_pkg.setdefault("overrides", {})
-        installs: list[FixAction] = []
+        deps = root_pkg.setdefault("dependencies", {})
 
         for action in actions:
-            if action.is_override:
-                overrides[action.package] = action.version
-                log.append(f"override {action.package} -> {action.version}")
-            else:
-                installs.append(action)
-                deps = root_pkg.setdefault("dependencies", {})
-                deps[action.package] = action.version
-                log.append(f"dependency {action.package} -> {action.version}")
+            deps[action.package] = action.version
+            log.append(f"pinned {action.package} -> {action.version}")
 
         root_pkg_path.write_text(json.dumps(root_pkg, indent=2) + "\n")
 
-        # A single `npm install` will apply overrides + new deps in one go.
         result = subprocess.run(["npm", "install"], cwd=self.root, capture_output=True, text=True)
         if result.returncode != 0:
             raise EcosystemError(f"`npm install` failed after applying fixes: {result.stderr.strip()}")

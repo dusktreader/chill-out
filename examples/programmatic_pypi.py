@@ -58,9 +58,11 @@ def main() -> None:
             print(f"    safe rollback: {v.safe_version.version} ({v.safe_version.age_days}d old)")
 
     print("\nFix plan:")
-    for action in plan_fixes(report):
-        kind = "override" if action.is_override else "dependency"
-        print(f"  {kind:10s} {action.package} -> {action.version}")
+    plan = plan_fixes(report)
+    for action in plan.actions:
+        print(f"  pin {action.package} -> {action.version}")
+    for entry in plan.unfixable:
+        print(f"  unfixable {entry.violation.name}=={entry.violation.version}: {entry.reason}")
 
 
 if __name__ == "__main__":

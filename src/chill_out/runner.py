@@ -22,7 +22,15 @@ from chill_out.cooldown import find_safe_principal_version, find_safe_version, i
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import RegistryError
-from chill_out.models import CheckReport, FixAction, InstalledPackage, PackageInfo, Violation
+from chill_out.models import (
+    CheckReport,
+    FixAction,
+    FixPlan,
+    InstalledPackage,
+    PackageInfo,
+    UnfixableViolation,
+    Violation,
+)
 
 
 async def _check_one(
@@ -144,28 +152,29 @@ def check(
     )
 
 
-def plan_fixes(report: CheckReport) -> list[FixAction]:
+def plan_fixes(report: CheckReport) -> FixPlan:
     """
-    Build a basic fix plan from a report, without principal rollback.
+    Build a basic fix plan from a report, without principal range checking.
 
-    Each violation with a known safe version becomes one :class:`FixAction`.
-    Transitive violations are emitted as overrides; principal violations as
-    direct dependency pins. For the smarter version that may also roll back a
-    principal whose declared range is incompatible with the safe transitive,
-    use :func:`plan_fixes_async`.
+    Each violation with a known safe version becomes a single :class:`FixAction`
+    that pins the package directly (in ``project.dependencies`` for pypi, in
+    ``dependencies`` for npm). Transitive violations get pinned as direct deps
+    too, so the resolver hoists them and they win over the principal's
+    declared range. Violations with no known safe version land in
+    :attr:`FixPlan.unfixable` so the caller can report them.
+
+    For the smarter version that range-checks transitive pins against the
+    installed principal and rolls the principal back when the declared range
+    can't admit the safe transitive, use :func:`plan_fixes_async`.
     """
-    actions: list[FixAction] = []
+    plan = FixPlan()
     for v in report.violations:
         if v.safe_version is None:
+            plan.unfixable.append(UnfixableViolation(v, "no safe version found within the cooldown window"))
             continue
-        actions.append(
-            FixAction(
-                package=v.name,
-                version=v.safe_version.version,
-                is_override=bool(v.via),
-            )
-        )
-    return _dedupe_actions(actions)
+        plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+    plan.actions = _dedupe_actions(plan.actions)
+    return plan
 
 
 async def plan_fixes_async(
@@ -175,25 +184,27 @@ async def plan_fixes_async(
     config: CooldownConfig | None = None,
     http: httpx.AsyncClient | None = None,
     now: pendulum.DateTime | None = None,
-) -> list[FixAction]:
+) -> FixPlan:
     """
-    Build a fix plan, rolling back principal versions when their declared range
-    can't admit the safe transitive version.
+    Build a fix plan with conflict-aware principal rollback.
 
-    For each transitive violation the runner:
+    Every violation gets pinned as a direct dependency in the project's
+    primary manifest. For transitive violations the runner first checks
+    whether pinning the safe version directly would conflict with the
+    installed principal's declared range. The flow is:
 
-    1. Looks up the principal's installed version in ``report.checked``.
-    2. Fetches the principal's manifest at that installed version. If the
-       declared range for the transitive already accepts the safe version,
-       emits just the override (same as :func:`plan_fixes`).
-    3. Otherwise, searches for an older principal version that has cleared
-       its own cooldown and whose declared range *does* admit the safe
-       transitive. Emits both an install action for the principal rollback
-       and an override for the transitive.
-
-    If no compatible principal can be found, the violation is skipped (the
-    user can still fix it manually). Principal violations are emitted as plain
-    install actions, identical to :func:`plan_fixes`.
+    1. **Direct violation:** pin the safe version. Done.
+    2. **Transitive violation, principal range admits the safe version:**
+       pin the safe version directly. The principal stays where it is and
+       the resolver hoists the direct pin.
+    3. **Transitive violation, principal range conflicts:** search for an
+       older principal version (out of cooldown, non-prerelease) whose
+       declared range *does* admit the safe transitive. If found, emit pins
+       for both the principal rollback and the transitive. If no compatible
+       older principal exists, record the violation in ``unfixable`` with a
+       structured reason so the caller can show the user their options
+       (downgrade the principal manually, raise the safe target, or wait
+       out the cooldown).
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
@@ -206,45 +217,45 @@ async def plan_fixes_async(
 
     installed_by_name: dict[str, InstalledPackage] = {p.name: p for p in report.checked}
 
-    actions: list[FixAction] = []
+    plan = FixPlan()
     try:
         for v in report.violations:
             if v.safe_version is None:
+                plan.unfixable.append(
+                    UnfixableViolation(v, "no safe version found within the cooldown window")
+                )
                 continue
             if not v.via:
-                actions.append(
-                    FixAction(
-                        package=v.name,
-                        version=v.safe_version.version,
-                    )
-                )
+                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
                 continue
+
             principal_pkg = installed_by_name.get(v.via)
             if principal_pkg is None:
-                actions.append(
-                    FixAction(
-                        package=v.name,
-                        version=v.safe_version.version,
-                        is_override=True,
-                    )
-                )
+                # Principal not in the installed set (rare, but possible if the
+                # via attribution races against a manifest edit). Pin the
+                # transitive directly; the resolver will figure it out.
+                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
                 continue
 
             installed_manifest = await client.fetch_version_manifest(v.via, principal_pkg.version)
             installed_range = installed_manifest.deps.get(v.name) if installed_manifest else None
             if installed_range is None or ecosystem.range_satisfies(v.safe_version.version, installed_range):
-                actions.append(
-                    FixAction(
-                        package=v.name,
-                        version=v.safe_version.version,
-                        is_override=True,
-                    )
-                )
+                # No conflict: a direct pin will hoist over whatever the principal asks for.
+                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
                 continue
 
+            # Conflict: try to roll the principal back to a version whose
+            # declared range admits the safe transitive.
             principal_info = await client.fetch_package(v.via)
             if principal_info is None:
-                logger.warning(f"Cannot roll back principal {v.via}: registry lookup failed")
+                plan.unfixable.append(
+                    UnfixableViolation(
+                        v,
+                        f"safe version {v.safe_version.version} conflicts with {v.via}@{principal_pkg.version} "
+                        f"(declares {v.name}{installed_range}), and the principal's release index could not be "
+                        "fetched to look for a rollback target.",
+                    )
+                )
                 continue
             candidate_versions = _candidate_principal_versions(principal_info, principal_pkg.version, config, now)
             fetched = await asyncio.gather(*(client.fetch_version_manifest(v.via, ver) for ver in candidate_versions))
@@ -260,28 +271,25 @@ async def plan_fixes_async(
                 now=now,
             )
             if principal_safe is None:
-                logger.warning(
-                    f"Cannot roll back principal {v.via} to admit {v.name}@{v.safe_version.version}; skipping"
+                plan.unfixable.append(
+                    UnfixableViolation(
+                        v,
+                        f"safe version {v.safe_version.version} conflicts with {v.via}@{principal_pkg.version} "
+                        f"(declares {v.name}{installed_range}), and no older {v.via} release that has cleared "
+                        f"its own cooldown declares a range that admits {v.name}=={v.safe_version.version}. "
+                        f"Options: downgrade {v.via} manually, raise the safe target for {v.name}, "
+                        "or wait out the cooldown.",
+                    )
                 )
                 continue
-            actions.append(
-                FixAction(
-                    package=v.via,
-                    version=principal_safe.version,
-                )
-            )
-            actions.append(
-                FixAction(
-                    package=v.name,
-                    version=v.safe_version.version,
-                    is_override=True,
-                )
-            )
+            plan.actions.append(FixAction(package=v.via, version=principal_safe.version))
+            plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
     finally:
         if own_http:
             await http.aclose()
 
-    return _dedupe_actions(actions)
+    plan.actions = _dedupe_actions(plan.actions)
+    return plan
 
 
 def _candidate_principal_versions(

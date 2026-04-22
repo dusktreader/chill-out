@@ -147,18 +147,34 @@ class TestNpmEcosystemNpmList:
 
 
 class TestNpmEcosystemApplyFixes:
-    def test_writes_overrides_and_runs_install(self, tmp_path: Path) -> None:
+    def test_pins_direct_dependency_and_runs_install(self, tmp_path: Path) -> None:
         _write_pkg_json(tmp_path / "package.json", {"name": "app", "dependencies": {"left-pad": "^1.0.0"}})
         eco = NpmEcosystem(tmp_path)
         from chill_out.models import FixAction
 
         fake_install = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
-            log = eco.apply_fixes([FixAction(package="left-pad", version="1.2.0", is_override=True)])
+            log = eco.apply_fixes([FixAction(package="left-pad", version="1.2.0")])
         new_pkg = json.loads((tmp_path / "package.json").read_text())
-        assert new_pkg["overrides"] == {"left-pad": "1.2.0"}
-        assert any("override" in line for line in log)
+        assert new_pkg["dependencies"]["left-pad"] == "1.2.0"
+        assert "overrides" not in new_pkg
+        assert any("pinned" in line for line in log)
         assert "ran: npm install" in log
+
+    def test_pins_transitive_as_direct_dependency(self, tmp_path: Path) -> None:
+        # No prior `left-pad` entry — transitive pins land in `dependencies`
+        # so the resolver hoists them.
+        _write_pkg_json(tmp_path / "package.json", {"name": "app", "dependencies": {"foo": "^1.0.0"}})
+        eco = NpmEcosystem(tmp_path)
+        from chill_out.models import FixAction
+
+        fake_install = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
+            eco.apply_fixes([FixAction(package="left-pad", version="1.2.0")])
+        new_pkg = json.loads((tmp_path / "package.json").read_text())
+        assert new_pkg["dependencies"]["left-pad"] == "1.2.0"
+        assert new_pkg["dependencies"]["foo"] == "^1.0.0"
+        assert "overrides" not in new_pkg
 
     def test_install_failure_raises(self, tmp_path: Path) -> None:
         _write_pkg_json(tmp_path / "package.json", {"name": "app"})

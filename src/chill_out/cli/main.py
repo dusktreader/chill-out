@@ -70,7 +70,7 @@ def check(
     import httpx
 
     from chill_out.constants import DEFAULT_TIMEOUT
-    from chill_out.models import CheckReport, FixAction
+    from chill_out.models import CheckReport, FixPlan
 
     if fix and fast:
         raise typer.BadParameter("--fix requires safe-version lookup; cannot be combined with --fast")
@@ -85,23 +85,27 @@ def check(
 
     console.print(f"Checking [bold]{eco.kind.value}[/bold] project at [dim]{root}[/dim]")
 
-    async def _run() -> tuple[CheckReport, list[FixAction]]:
+    async def _run() -> tuple[CheckReport, FixPlan | None]:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http:
             report = await check_async(eco, config=config, deep=deep, fast=fast, http=http)
-            actions: list[FixAction] = []
+            plan: FixPlan | None = None
             if fix and report.has_violations:
-                actions = await plan_fixes_async(report, eco, config=config, http=http)
-            return report, actions
+                plan = await plan_fixes_async(report, eco, config=config, http=http)
+            return report, plan
 
-    report, actions = asyncio.run(_run())
+    report, plan = asyncio.run(_run())
     render_report(report, console, fast=fast)
 
-    if fix and report.has_violations:
-        if not actions:
+    if fix and report.has_violations and plan is not None:
+        if plan.unfixable:
+            console.print(f"[yellow]{len(plan.unfixable)} violation(s) cannot be auto-fixed:[/yellow]")
+            for entry in plan.unfixable:
+                console.print(f"  [yellow]- {entry.violation.name}=={entry.violation.version}:[/yellow] {entry.reason}")
+        if not plan.actions:
             console.print("[yellow]No fixable violations.[/yellow]")
         else:
-            console.print(f"[bold]Applying {len(actions)} fix action(s)...[/bold]")
-            log = eco.apply_fixes(actions)
+            console.print(f"[bold]Applying {len(plan.actions)} fix action(s)...[/bold]")
+            log = eco.apply_fixes(plan.actions)
             for line in log:
                 console.print(f"  [dim]{line}[/dim]")
             console.print("[green]Fix complete. Re-run `chill-out check` to verify.[/green]")

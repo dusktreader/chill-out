@@ -60,10 +60,12 @@ Pass `--fix` to let `chill-out` rewrite your manifest and re-resolve:
 chill-out check --fix
 ```
 
-For npm projects, this writes the safe versions into `overrides` (for
-transitive deps) or `dependencies` (for principals), then runs `npm install`.
-For Python projects, it pins each violating dep to its safe version inside
-`pyproject.toml` and runs `uv lock`.
+For npm projects, this pins each violating dep to its safe version directly
+in `dependencies` (the resolver hoists transitive pins above whatever the
+principal asks for) and runs `npm install`. For Python projects, it pins each
+violating dep to its safe version inside `pyproject.toml` and runs `uv lock`.
+When a transitive conflict can't be resolved by hoisting alone, the principal
+gets rolled back to a version that admits the safe transitive.
 
 
 ## Wire it into CI
