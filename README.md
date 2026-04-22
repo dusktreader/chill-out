@@ -5,6 +5,8 @@
 
 # chill-out
 
+![chill-out](https://github.com/dusktreader/chill-out/blob/main/docs/source/images/chill.png?raw=true)
+
 _Tell your dependencies to chill out and wait a few days before you trust them._
 
 A brand-new release of one of your dependencies is the riskiest thing in your
@@ -51,8 +53,9 @@ The complete documentation lives at the
 ## Demo
 
 To poke at the features without installing anything globally, run the demo
-through `uv`:
+through `uv` (the `[demo]` extra pulls in the registry-mocking helper used by
+the npm and pypi walkthroughs):
 
 ```bash
-uvx --from chill-out chill-out-demo
+uvx --from "chill-out[demo]" chill-out-demo
 ```

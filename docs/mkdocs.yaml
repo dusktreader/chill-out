@@ -12,6 +12,8 @@ repo_url: https://github.com/dusktreader/chill-out
 docs_dir: source
 theme:
   name: material
+  logo: images/chill.png
+  favicon: images/chill.png
   features:
     - navigation.expand
     - navigation.footer
