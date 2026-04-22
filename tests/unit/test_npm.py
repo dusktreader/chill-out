@@ -229,27 +229,15 @@ class TestNpmEcosystemLoadDeep:
 
     def test_unparsable_package_json_is_skipped(self, tmp_path: Path) -> None:
         (tmp_path / "package.json").write_text("garbage")
-        # Add a valid sub-package.json so we don't hit the "no deps declared" code path entirely.
-        sub = tmp_path / "sub"
-        sub.mkdir()
-        _write_pkg_json(sub / "package.json", {"name": "sub", "dependencies": {"x": "^1"}})
         eco = NpmEcosystem(tmp_path)
         with patch.object(
             NpmEcosystem,
             "_npm_list",
-            return_value={
-                "dependencies": {
-                    "sub": {
-                        "version": "0.0.0",
-                        "resolved": "file:./sub",
-                        "name": "sub",
-                        "dependencies": {"x": {"version": "1.0.0"}},
-                    }
-                }
-            },
+            return_value={"dependencies": {"x": {"version": "1.0.0"}}},
         ):
+            # No declared deps can be read, so nothing is reported even though npm list returns x.
             pkgs = eco.load_installed(deep=False)
-        assert {p.name for p in pkgs} == {"x"}
+        assert pkgs == []
 
 
 class TestNpmFetchVersionManifest:

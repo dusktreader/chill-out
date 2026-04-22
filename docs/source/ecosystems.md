@@ -26,10 +26,13 @@ The npm backend uses `npm list --json` to enumerate installed packages and the
 [npm registry](https://registry.npmjs.org) to fetch publish dates.
 
 In the default mode, the backend only reports on packages declared as direct
-dependencies in any `package.json` under the project root (root, plus each
-workspace). With `--deep`, it includes every transitive package as well, and
-attributes each transitive to its principal via a reverse-graph BFS over
-`package-lock.json`.
+dependencies in the root `package.json`. With `--deep`, it includes every
+transitive package as well, and attributes each transitive to its principal via
+a reverse-graph BFS over `package-lock.json`.
+
+Workspaces are not supported in v1. If your repository is an npm workspace
+monorepo, run chill-out from each sub-project's directory rather than from the
+workspace root.
 
 `--fix` writes safe versions into the root `package.json`:
 
@@ -54,6 +57,10 @@ than guess.
 
 `--fix` rewrites `pyproject.toml` to pin each violating dep to its safe
 version, then runs `uv lock` to regenerate `uv.lock`.
+
+uv workspaces (the `[tool.uv.workspace]` block) are not supported in v1. If
+your repository is a uv workspace, run chill-out from each member's directory
+rather than from the workspace root.
 
 
 ## Adding a new backend

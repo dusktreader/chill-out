@@ -162,7 +162,6 @@ def plan_fixes(report: CheckReport) -> list[FixAction]:
             FixAction(
                 package=v.name,
                 version=v.safe_version.version,
-                workspace=v.workspace,
                 is_override=bool(v.via),
             )
         )
@@ -205,9 +204,7 @@ async def plan_fixes_async(
     assert http is not None
     client = CachingRegistryClient(ecosystem.make_client(http))
 
-    installed_by_key: dict[tuple[str, str | None], InstalledPackage] = {
-        (p.name, p.workspace): p for p in report.checked
-    }
+    installed_by_name: dict[str, InstalledPackage] = {p.name: p for p in report.checked}
 
     actions: list[FixAction] = []
     try:
@@ -219,17 +216,15 @@ async def plan_fixes_async(
                     FixAction(
                         package=v.name,
                         version=v.safe_version.version,
-                        workspace=v.workspace,
                     )
                 )
                 continue
-            principal_pkg = installed_by_key.get((v.via, v.workspace))
+            principal_pkg = installed_by_name.get(v.via)
             if principal_pkg is None:
                 actions.append(
                     FixAction(
                         package=v.name,
                         version=v.safe_version.version,
-                        workspace=v.workspace,
                         is_override=True,
                     )
                 )
@@ -242,7 +237,6 @@ async def plan_fixes_async(
                     FixAction(
                         package=v.name,
                         version=v.safe_version.version,
-                        workspace=v.workspace,
                         is_override=True,
                     )
                 )
@@ -274,14 +268,12 @@ async def plan_fixes_async(
                 FixAction(
                     package=v.via,
                     version=principal_safe.version,
-                    workspace=v.workspace,
                 )
             )
             actions.append(
                 FixAction(
                     package=v.name,
                     version=v.safe_version.version,
-                    workspace=v.workspace,
                     is_override=True,
                 )
             )
@@ -324,12 +316,12 @@ def _candidate_principal_versions(
 
 
 def _dedupe_actions(actions: Iterable[FixAction]) -> list[FixAction]:
-    """Deduplicate by (package, workspace), keeping the smallest version."""
+    """Deduplicate by package name, keeping the smallest version."""
     from packaging.version import InvalidVersion, Version
 
-    out: dict[tuple[str, str | None], FixAction] = {}
+    out: dict[str, FixAction] = {}
     for a in actions:
-        key = (a.package, a.workspace)
+        key = a.package
         existing = out.get(key)
         if existing is None:
             out[key] = a

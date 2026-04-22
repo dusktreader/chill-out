@@ -106,69 +106,52 @@ class NpmEcosystem(Ecosystem):
             return self._load_all()
         return self._load_direct()
 
-    def _read_package_jsons(self) -> tuple[set[str], dict[str, str], set[str]]:
+    def _read_root_package_json(self) -> set[str]:
         """
-        Read every non-vendored ``package.json`` under the project root.
+        Read the root ``package.json`` and return the set of declared dependency names.
 
-        Returns:
-            A tuple of ``(declared_dep_names, workspace_for, workspace_names)``.
+        Workspaces and nested ``package.json`` files are intentionally ignored;
+        for monorepos, run chill-out from each sub-project's directory.
         """
         dep_names: set[str] = set()
-        workspace_for: dict[str, str] = {}
-        workspace_names: set[str] = set()
-        for pkg_json in self.root.glob("**/package.json"):
-            if "node_modules" in pkg_json.parts:
-                continue
-            try:
-                doc = json.loads(pkg_json.read_text())
-            except json.JSONDecodeError:
-                logger.warning(f"Skipping unreadable package.json: {pkg_json}")
-                continue
-            label = doc.get("name") or str(pkg_json.parent.relative_to(self.root))
-            if pkg_json.parent != self.root and doc.get("name"):
-                workspace_names.add(doc["name"])
-            for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
-                for name in doc.get(section, {}) or {}:
-                    dep_names.add(name)
-                    workspace_for.setdefault(name, label)
-        return dep_names, workspace_for, workspace_names
+        root_pkg = self.root / "package.json"
+        if not root_pkg.is_file():
+            return dep_names
+        try:
+            doc = json.loads(root_pkg.read_text())
+        except json.JSONDecodeError:
+            logger.warning(f"Skipping unreadable package.json: {root_pkg}")
+            return dep_names
+        for section in ("dependencies", "devDependencies", "peerDependencies", "optionalDependencies"):
+            for name in doc.get(section, {}) or {}:
+                dep_names.add(name)
+        return dep_names
 
     def _load_direct(self) -> list[InstalledPackage]:
-        dep_names, workspace_for, workspace_names = self._read_package_jsons()
+        dep_names = self._read_root_package_json()
         data = self._npm_list(depth=1)
 
-        packages: dict[tuple[str, str | None], InstalledPackage] = {}
+        packages: dict[str, InstalledPackage] = {}
 
-        def register(name: str, info: dict[str, Any], workspace: str | None) -> None:
-            if name not in dep_names or name in workspace_names:
-                return
+        for name, info in (data.get("dependencies") or {}).items():
+            if name not in dep_names:
+                continue
             if str(info.get("resolved", "")).startswith("file:"):
-                return
+                continue
             version = info.get("version")
             if not version:
-                return
-            ws = workspace or workspace_for.get(name)
-            key = (name, ws)
-            if key not in packages:
-                packages[key] = InstalledPackage(
+                continue
+            if name not in packages:
+                packages[name] = InstalledPackage(
                     name=name,
                     version=version,
                     ecosystem=self.kind,
-                    workspace=ws,
                 )
-
-        for name, info in (data.get("dependencies") or {}).items():
-            if str(info.get("resolved", "")).startswith("file:"):
-                ws_label = info.get("name") or name
-                for dep_name, dep_info in (info.get("dependencies") or {}).items():
-                    register(dep_name, dep_info, ws_label)
-            else:
-                register(name, info, None)
 
         return list(packages.values())
 
     def _load_all(self) -> list[InstalledPackage]:
-        dep_names, _, workspace_names = self._read_package_jsons()
+        dep_names = self._read_root_package_json()
         data = self._npm_list(depth=None)
 
         # Build a reverse-dep graph from package-lock.json so we can attribute
@@ -196,32 +179,24 @@ class NpmEcosystem(Ecosystem):
                         queue.append(parent)
             return ()
 
-        packages: dict[tuple[str, str | None], InstalledPackage] = {}
+        packages: dict[str, InstalledPackage] = {}
 
-        def collect(node: dict[str, Any], workspace: str | None) -> None:
+        def collect(node: dict[str, Any]) -> None:
             for name, info in (node.get("dependencies") or {}).items():
-                if name in workspace_names:
-                    continue
                 version = info.get("version")
                 if not version:
                     continue
-                key = (name, workspace)
-                if key not in packages:
+                if name not in packages:
                     via_chain = () if name in dep_names else find_via_chain(name)
-                    packages[key] = InstalledPackage(
+                    packages[name] = InstalledPackage(
                         name=name,
                         version=version,
                         ecosystem=self.kind,
-                        workspace=workspace,
                         via_chain=via_chain,
                     )
-                collect(info, workspace)
+                collect(info)
 
-        for name, info in (data.get("dependencies") or {}).items():
-            if str(info.get("resolved", "")).startswith("file:"):
-                collect(info, info.get("name") or name)
-            else:
-                collect({"dependencies": {name: info}}, None)
+        collect(data)
 
         return list(packages.values())
 

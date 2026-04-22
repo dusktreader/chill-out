@@ -203,12 +203,14 @@ class TestDedupe:
         assert out[0].version == "1.5.0"
 
     def test_treats_workspaces_separately(self) -> None:
+        # Workspace support was removed in v1; ensure dedupe collapses by package name only.
         actions = [
-            FixAction(package="a", version="1.0.0", workspace="w1"),
-            FixAction(package="a", version="2.0.0", workspace="w2"),
+            FixAction(package="a", version="1.0.0"),
+            FixAction(package="a", version="2.0.0"),
         ]
         out = _dedupe_actions(actions)
-        assert len(out) == 2
+        assert len(out) == 1
+        assert out[0].version == "1.0.0"
 
 
 class TestPlanFixesAsync:

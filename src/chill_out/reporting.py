@@ -66,7 +66,7 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
 
     has_via = any(v.via for v in report.violations)
 
-    for v in sorted(report.violations, key=lambda x: (x.workspace or "", x.name)):
+    for v in sorted(report.violations, key=lambda x: x.name):
         bump_color = _BUMP_COLOR.get(v.bump, "white")
         row = [
             f"[bold]{v.name}[/bold]",

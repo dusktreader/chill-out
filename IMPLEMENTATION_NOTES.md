@@ -165,10 +165,13 @@ chill-out/
 
 A few things from the original script were intentionally deferred:
 
-- **Workspace-aware fix application.** Per-workspace fix actions are tracked
-  in the model but the npm and pypi fixers currently apply everything to the
-  root manifest. This is fine for single-project setups but loses fidelity
-  in npm workspaces.
+- **Monorepo / workspace support.** v1 deliberately treats each project as a
+  flat single-root layout. The npm backend reads only the root `package.json`
+  and ignores nested ones; the pypi backend reads only the root
+  `pyproject.toml` and ignores `[tool.uv.workspace]` members. For a monorepo,
+  run `chill-out` from each sub-project's directory. A workspace-aware mode
+  (per-member detection, dispatch with `npm install --workspace=` and
+  `uv sync --package=`) is a candidate for a future release.
 - **Disk-backed registry cache.** The in-memory cache is per-process. CI
   runs that invoke `chill-out` repeatedly will refetch each time. A simple
   TTL cache under `platformdirs.user_cache_dir()` would close that gap.

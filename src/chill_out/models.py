@@ -18,9 +18,6 @@ class InstalledPackage:
     name: str
     version: str
     ecosystem: EcosystemKind
-    workspace: str | None = None
-    """ The workspace (npm) or sub-project that pulled in the dependency, if any. """
-
     via_chain: tuple[str, ...] = ()
     """
     Reverse path from this package up to the principal dependency that pulled it in.
@@ -99,10 +96,6 @@ class Violation:
         return self.package.version
 
     @property
-    def workspace(self) -> str | None:
-        return self.package.workspace
-
-    @property
     def via(self) -> str | None:
         return self.package.via
 
@@ -113,7 +106,6 @@ class FixAction:
 
     package: str
     version: str
-    workspace: str | None = None
     is_override: bool = False
     """ True if the action should be applied as an override pin (transitive), false for a direct install. """
 
