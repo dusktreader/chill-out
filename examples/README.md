@@ -34,15 +34,22 @@ bash examples/cli_check.sh
 |--------------------------------|-----------|------------------------------------------------------|
 | `projects/npm-app/`            | npm       | direct pin + principal rollback on conflict          |
 | `projects/python-app/`         | pypi      | direct pin + principal rollback on conflict          |
+| `shop-monorepo/`               | npm       | shared transitive routed through workspace overrides |
 
-Each project has a real `package.json` / `pyproject.toml`, a lockfile, a
-`.chill-out.yaml` config, and a `run_demo.py` that mocks the registry and
-prints the full check report, the planned fix actions, and the resulting
-manifest after `--fix` runs:
+Each `projects/` example has a real `package.json` / `pyproject.toml`, a
+lockfile, a `.chill-out.yaml` config, and a `run_demo.py` that mocks the
+registry and prints the full check report, the planned fix actions, and
+the resulting manifest after `--fix` runs:
 
 ```bash
 uv run python examples/projects/npm-app/run_demo.py
 uv run python examples/projects/python-app/run_demo.py
 ```
+
+`shop-monorepo/` is a live npm workspace fixture (no mocks). Install
+its deps with `npm install` and then run chill-out against the
+workspace root to see Tier 1 detection of a shared transitive plus
+Tier 2 routing of the fix through the workspace-root `overrides`
+field. See [`shop-monorepo/README.md`](shop-monorepo/README.md).
 
 The narrated walkthrough lives in [`docs/source/examples.md`](../docs/source/examples.md).

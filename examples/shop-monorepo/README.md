@@ -3,6 +3,7 @@
 An anonymized npm workspace that reproduces a real-world dependency
 conflict that single-root cooldown checkers can't fix on their own.
 
+
 ## The puzzle
 
 Three workspace members share a transitive dependency on
@@ -25,6 +26,7 @@ in the workspace root's `package.json`, which is exactly what
 chill-out's Tier 2 fix path applies automatically when it sees a
 violation shared across two or more members.
 
+
 ## How chill-out should handle it
 
 Run from the workspace root:
@@ -40,6 +42,7 @@ and writes the fix to `examples/shop-monorepo/package.json`'s
 strategy column shows
 `(shared: @shop/api, @shop/worker; will use overrides)` to flag the
 shared-routing decision before the fix runs.
+
 
 ## Setup
 
