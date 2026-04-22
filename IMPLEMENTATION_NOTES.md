@@ -73,11 +73,44 @@ For PyPI projects, `--fix` edits `pyproject.toml` in place using `tomlkit`
 the lockfile. For npm, it adds `overrides` entries to `package.json` for
 transitive deps and runs `npm install` to refresh `package-lock.json`.
 
-The original script had a more elaborate "principal rollback" strategy
-where, if pinning a transitive dep created an unsatisfiable constraint, it
-would walk up the dependency tree and roll back the principal package
-instead. That is **not** yet implemented here. For now, the fixer pins
-overrides directly and surfaces an error if the override is incompatible.
+### Principal rollback
+
+When a transitive dependency is in cooldown, the simple fix is to pin the
+transitive to an older safe version via an override. That works as long as
+the principal package's declared range still admits the safe version. When
+it doesn't, the override either silently lies (npm) or breaks the lock
+resolution (pip / uv).
+
+The fix planner handles this in `plan_fixes_async`:
+
+1. Look up the principal's installed version in the report.
+2. Fetch its manifest from the registry.
+3. If the declared range for the transitive already accepts the safe
+   version, emit just the override.
+4. Otherwise, walk older principal versions (out of cooldown, prereleases
+   skipped) and pick the newest one whose declared range *does* admit the
+   safe transitive. Emit two actions: install that older principal, and
+   override the transitive.
+
+The range check is delegated to the ecosystem via `Ecosystem.range_satisfies`.
+The npm implementation shells out to `node -e "require('semver').satisfies(...)"`,
+matching the original script. The PyPI implementation uses
+`packaging.SpecifierSet`. Both fall back permissively when the inputs can't
+be parsed, mirroring the original's "assume compatible if we can't tell"
+behavior.
+
+When no compatible older principal exists, the planner skips the violation
+with a warning rather than emitting a doomed action.
+
+### Registry caching
+
+`CachingRegistryClient` wraps any `RegistryClient` with a per-process,
+in-memory dedupe cache for both `fetch_package` and `fetch_version_manifest`.
+In-flight tasks are also tracked, so concurrent callers asking for the same
+key share a single network round-trip. The runner wraps every client in this
+cache by default. There's no disk persistence: a fresh process always hits
+the registry once per (package, version), trading a tiny bit of network for
+zero cache-invalidation pain.
 
 ### Documentation tooling
 
@@ -132,12 +165,10 @@ chill-out/
 
 A few things from the original script were intentionally deferred:
 
-- **Principal rollback for incompatible transitive overrides.** When pinning
-  a transitive dep to an older version conflicts with a principal's
-  declared range, the original script would search for an older principal
-  version whose range admits the safe transitive. This implementation
-  raises an error in that case instead.
-- **Caching of registry responses.** Each run hits the registry fresh.
-- **Parallel registry fetches.** The async backbone is in place but the
-  runner currently fetches packages sequentially. This is fine for small
-  projects and easy to switch on later.
+- **Workspace-aware fix application.** Per-workspace fix actions are tracked
+  in the model but the npm and pypi fixers currently apply everything to the
+  root manifest. This is fine for single-project setups but loses fidelity
+  in npm workspaces.
+- **Disk-backed registry cache.** The in-memory cache is per-process. CI
+  runs that invoke `chill-out` repeatedly will refetch each time. A simple
+  TTL cache under `platformdirs.user_cache_dir()` would close that gap.

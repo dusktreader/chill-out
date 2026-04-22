@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 
 from chill_out.constants import EcosystemKind
-from chill_out.models import FixAction, InstalledPackage, PackageInfo
+from chill_out.models import FixAction, InstalledPackage, PackageInfo, VersionManifest
 
 
 class RegistryClient(ABC):
@@ -27,6 +27,16 @@ class RegistryClient(ABC):
     @abstractmethod
     async def fetch_package(self, name: str) -> PackageInfo | None:
         """Return all release info for a package, or ``None`` if it cannot be retrieved."""
+        ...
+
+    @abstractmethod
+    async def fetch_version_manifest(self, name: str, version: str) -> VersionManifest | None:
+        """
+        Return the dependency declarations for a single (name, version) pair.
+
+        Used by principal-rollback to discover which transitive ranges a candidate
+        principal version declares. Returns ``None`` if the manifest cannot be retrieved.
+        """
         ...
 
 
@@ -69,5 +79,15 @@ class Ecosystem(ABC):
 
         Returns:
             A list of human-readable lines describing the changes that were made.
+        """
+        ...
+
+    @abstractmethod
+    def range_satisfies(self, version: str, range_spec: str) -> bool:
+        """
+        Return True if ``version`` satisfies the ecosystem-specific ``range_spec``.
+
+        Used by principal-rollback to test whether a candidate principal's
+        declared range admits the safe transitive version.
         """
         ...

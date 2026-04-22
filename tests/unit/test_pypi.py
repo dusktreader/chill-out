@@ -170,3 +170,119 @@ class TestPypiEcosystemApplyFixes:
 class TestNormalize:
     def test_lowercases_and_collapses_separators(self) -> None:
         assert _normalize("Foo_Bar.baz--qux") == "foo-bar-baz-qux"
+
+
+class TestPypiFetchVersionManifest:
+    @pytest.fixture
+    async def http_client(self):
+        async with httpx.AsyncClient() as client:
+            yield client
+
+    @respx.mock
+    async def test_returns_requires_dist_specifiers(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/requests/2.31.0/json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "info": {
+                        "requires_dist": [
+                            "urllib3>=1.21.1,<3",
+                            "certifi>=2017.4.17",
+                        ]
+                    }
+                },
+            )
+        )
+        client = PypiRegistryClient(http_client)
+        manifest = await client.fetch_version_manifest("requests", "2.31.0")
+        assert manifest is not None
+        assert set(manifest.deps) == {"urllib3", "certifi"}
+        assert "1.21.1" in manifest.deps["urllib3"]
+        assert "2017.4.17" in manifest.deps["certifi"]
+
+    @respx.mock
+    async def test_skips_extra_marker_requirements(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/requests/2.31.0/json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "info": {
+                        "requires_dist": [
+                            "urllib3>=1.21.1",
+                            "pysocks>=1.5.6; extra == 'socks'",
+                        ]
+                    }
+                },
+            )
+        )
+        client = PypiRegistryClient(http_client)
+        manifest = await client.fetch_version_manifest("requests", "2.31.0")
+        assert manifest is not None
+        assert "urllib3" in manifest.deps
+        assert "pysocks" not in manifest.deps
+
+    @respx.mock
+    async def test_skips_unparsable_entries(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/foo/1.0/json").mock(
+            return_value=httpx.Response(
+                200,
+                json={"info": {"requires_dist": ["valid>=1", "this is garbage"]}},
+            )
+        )
+        client = PypiRegistryClient(http_client)
+        manifest = await client.fetch_version_manifest("foo", "1.0")
+        assert manifest is not None
+        assert manifest.deps == {"valid": ">=1"}
+
+    @respx.mock
+    async def test_404_returns_none(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/foo/1.0/json").mock(return_value=httpx.Response(404))
+        client = PypiRegistryClient(http_client)
+        assert await client.fetch_version_manifest("foo", "1.0") is None
+
+    @respx.mock
+    async def test_500_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/foo/1.0/json").mock(return_value=httpx.Response(500))
+        client = PypiRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "1.0")
+
+    @respx.mock
+    async def test_transport_error_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/foo/1.0/json").mock(side_effect=httpx.ConnectError("boom"))
+        client = PypiRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "1.0")
+
+    @respx.mock
+    async def test_non_json_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{PYPI_REGISTRY}/foo/1.0/json").mock(return_value=httpx.Response(200, content=b"not json"))
+        client = PypiRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "1.0")
+
+
+class TestPypiRangeSatisfies:
+    def _eco(self, tmp_path: Path) -> PypiEcosystem:
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\nversion = '0.1'\n")
+        return PypiEcosystem(tmp_path)
+
+    def test_admits_version_in_range(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        assert eco.range_satisfies("1.5.0", ">=1.0,<2.0") is True
+
+    def test_rejects_version_outside_range(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        assert eco.range_satisfies("2.5.0", ">=1.0,<2.0") is False
+
+    def test_empty_range_admits_anything(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        assert eco.range_satisfies("99.99.99", "") is True
+
+    def test_unparsable_version_falls_back_permissive(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        assert eco.range_satisfies("not-a-version", ">=1.0") is True
+
+    def test_unparsable_specifier_falls_back_permissive(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        assert eco.range_satisfies("1.0.0", "not a specifier") is True

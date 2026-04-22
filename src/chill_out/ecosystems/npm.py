@@ -21,7 +21,7 @@ from loguru import logger
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
-from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease
+from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease, VersionManifest
 
 NPM_REGISTRY = "https://registry.npmjs.org"
 
@@ -63,6 +63,26 @@ class NpmRegistryClient(RegistryClient):
             assert isinstance(published, pendulum.DateTime)
             releases[ver] = PackageRelease(version=ver, published=published)
         return PackageInfo(name=name, releases=releases)
+
+    async def fetch_version_manifest(self, name: str, version: str) -> VersionManifest | None:
+        """Fetch dependency declarations for ``{name}@{version}`` from the npm registry."""
+        url = f"{self.base_url}/{name}/{version}"
+        try:
+            res = await self.http.get(url)
+        except httpx.TransportError as exc:
+            raise RegistryError(f"npm registry transport error for {name}@{version}: {exc}") from exc
+        if res.status_code == 404:
+            return None
+        if res.status_code != 200:
+            raise RegistryError(f"npm registry returned HTTP {res.status_code} for {name}@{version}")
+        try:
+            data = res.json()
+        except json.JSONDecodeError as exc:
+            raise RegistryError(f"npm registry returned non-JSON body for {name}@{version}: {exc}") from exc
+        deps: dict[str, str] = {}
+        deps.update(data.get("dependencies") or {})
+        deps.update(data.get("peerDependencies") or {})
+        return VersionManifest(name=name, version=version, deps=deps)
 
 
 class NpmEcosystem(Ecosystem):
@@ -244,6 +264,37 @@ class NpmEcosystem(Ecosystem):
     # ------------------------------------------------------------------
     # Fix application
     # ------------------------------------------------------------------
+
+    def range_satisfies(self, version: str, range_spec: str) -> bool:
+        """
+        Check whether ``version`` satisfies an npm semver ``range_spec``.
+
+        Shells out to ``node -e "require('semver').satisfies(...)"``. If node or
+        the semver package isn't available, conservatively returns ``True`` (the
+        original script's "assume compatible" fallback for transitive deps with
+        no discoverable range).
+        """
+        script = (
+            f"const s=require('semver');process.exit(s.satisfies({json.dumps(version)},{json.dumps(range_spec)})?0:1)"
+        )
+        try:
+            result = subprocess.run(
+                ["node", "-e", script],
+                capture_output=True,
+                text=True,
+                cwd=self.root,
+            )
+        except FileNotFoundError:
+            logger.warning("node not found on PATH; assuming range is satisfied")
+            return True
+        if result.returncode == 0:
+            return True
+        if result.returncode == 1:
+            return False
+        # Any other exit code (parse error, missing semver module) is treated as
+        # an unknown answer; default to permissive to avoid spurious rollbacks.
+        logger.warning(f"node semver check failed for {version} against {range_spec!r}: {result.stderr.strip()}")
+        return True
 
     def apply_fixes(self, actions: list[FixAction]) -> list[str]:
         if not actions:

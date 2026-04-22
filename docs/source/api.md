@@ -44,6 +44,38 @@ asyncio.run(main())
 connection pool with the rest of your application.
 
 
+## Planning fixes with principal rollback
+
+`plan_fixes(report)` returns the simple set of overrides and pins. When a
+transitive dep is in cooldown but its principal's declared range can't admit
+the safe transitive, that override would either silently lie (npm) or break
+the resolver (pip / uv). `plan_fixes_async` handles those cases by walking
+older principal versions for one whose range *does* admit the safe
+transitive, and emitting both a principal install and a transitive override.
+
+```python
+import asyncio
+from pathlib import Path
+
+import httpx
+from chill_out import PypiEcosystem, check_async, plan_fixes_async
+
+async def main() -> None:
+    eco = PypiEcosystem(Path.cwd())
+    async with httpx.AsyncClient() as http:
+        report = await check_async(eco, http=http)
+        actions = await plan_fixes_async(report, eco, http=http)
+    for action in actions:
+        kind = "override" if action.is_override else "install"
+        print(f"{kind}: {action.package} -> {action.version}")
+
+asyncio.run(main())
+```
+
+Sharing the `httpx.AsyncClient` between `check_async` and `plan_fixes_async`
+means the registry cache built up during the check is reused during planning.
+
+
 ## Building a report manually
 
 `CooldownConfig`, `release_type`, `is_within_cooldown`, and `find_safe_version`

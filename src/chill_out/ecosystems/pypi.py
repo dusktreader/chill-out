@@ -19,11 +19,13 @@ import pendulum
 import tomlkit
 from loguru import logger
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
 
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
-from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease
+from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease, VersionManifest
 
 PYPI_REGISTRY = "https://pypi.org/pypi"
 
@@ -72,6 +74,42 @@ class PypiRegistryClient(RegistryClient):
             if stamps:
                 releases[ver] = PackageRelease(version=ver, published=min(stamps))
         return PackageInfo(name=name, releases=releases)
+
+    async def fetch_version_manifest(self, name: str, version: str) -> VersionManifest | None:
+        """
+        Fetch the dependency declarations for a single PyPI release.
+
+        Pulls ``info.requires_dist`` from the per-version JSON endpoint. Markers
+        that gate a requirement on an ``extra`` are skipped: those represent
+        optional installs and don't constrain the base resolution.
+        """
+        url = f"{self.base_url}/{name}/{version}/json"
+        try:
+            res = await self.http.get(url)
+        except httpx.TransportError as exc:
+            raise RegistryError(f"PyPI transport error for {name}=={version}: {exc}") from exc
+        if res.status_code == 404:
+            return None
+        if res.status_code != 200:
+            raise RegistryError(f"PyPI returned HTTP {res.status_code} for {name}=={version}")
+        try:
+            data = res.json()
+        except json.JSONDecodeError as exc:
+            raise RegistryError(f"PyPI returned non-JSON body for {name}=={version}: {exc}") from exc
+
+        deps: dict[str, str] = {}
+        for raw in (data.get("info", {}) or {}).get("requires_dist") or []:
+            try:
+                req = Requirement(raw)
+            except InvalidRequirement:
+                logger.warning(f"Skipping unparsable requires_dist entry for {name}=={version}: {raw!r}")
+                continue
+            # Skip optional-extra requirements; they only apply when the parent
+            # is installed with that extra, which we don't track.
+            if req.marker is not None and "extra" in str(req.marker):
+                continue
+            deps[req.name] = str(req.specifier) if req.specifier else ""
+        return VersionManifest(name=name, version=version, deps=deps)
 
 
 class PypiEcosystem(Ecosystem):
@@ -245,6 +283,30 @@ class PypiEcosystem(Ecosystem):
     # ------------------------------------------------------------------
     # Fix application
     # ------------------------------------------------------------------
+
+    def range_satisfies(self, version: str, range_spec: str) -> bool:
+        """
+        Return True if ``version`` satisfies a PEP 440 ``range_spec``.
+
+        An empty or whitespace-only range matches any version (matches
+        ``packaging``'s ``SpecifierSet("")`` semantics). Unparsable inputs are
+        treated permissively to match the original script's "assume compatible"
+        behavior for transitive deps with no discoverable range.
+        """
+        if not range_spec or not range_spec.strip():
+            return True
+        try:
+            parsed = Version(version)
+        except InvalidVersion:
+            logger.warning(f"Cannot parse version {version!r}; assuming range is satisfied")
+            return True
+        try:
+            spec = SpecifierSet(range_spec)
+        except InvalidSpecifier:
+            logger.warning(f"Cannot parse specifier {range_spec!r}; assuming range is satisfied")
+            return True
+        # prereleases=True so that a candidate like 1.0.0rc1 isn't silently filtered.
+        return spec.contains(parsed, prereleases=True)
 
     def apply_fixes(self, actions: list[FixAction]) -> list[str]:
         if not actions:

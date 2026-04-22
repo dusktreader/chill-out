@@ -15,13 +15,14 @@ import httpx
 import pendulum
 from loguru import logger
 
+from chill_out.cache import CachingRegistryClient
 from chill_out.config import CooldownConfig, load_config
 from chill_out.constants import DEFAULT_CONCURRENCY, DEFAULT_TIMEOUT, EcosystemKind
-from chill_out.cooldown import find_safe_version, is_within_cooldown, release_type
+from chill_out.cooldown import find_safe_principal_version, find_safe_version, is_within_cooldown, release_type
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import RegistryError
-from chill_out.models import CheckReport, FixAction, InstalledPackage, Violation
+from chill_out.models import CheckReport, FixAction, InstalledPackage, PackageInfo, Violation
 
 
 async def _check_one(
@@ -100,7 +101,7 @@ async def check_async(
         http = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
     assert http is not None
     try:
-        client = ecosystem.make_client(http)
+        client = CachingRegistryClient(ecosystem.make_client(http))
         results = await asyncio.gather(
             *(_check_one(pkg, client, config, semaphore, fast=fast, now=now) for pkg in packages)
         )
@@ -145,10 +146,13 @@ def check(
 
 def plan_fixes(report: CheckReport) -> list[FixAction]:
     """
-    Convert each violation that has a known safe version into a :class:`FixAction`.
+    Build a basic fix plan from a report, without principal rollback.
 
-    Transitive violations are written as overrides; principal violations as
-    direct dependency pins.
+    Each violation with a known safe version becomes one :class:`FixAction`.
+    Transitive violations are emitted as overrides; principal violations as
+    direct dependency pins. For the smarter version that may also roll back a
+    principal whose declared range is incompatible with the safe transitive,
+    use :func:`plan_fixes_async`.
     """
     actions: list[FixAction] = []
     for v in report.violations:
@@ -163,6 +167,160 @@ def plan_fixes(report: CheckReport) -> list[FixAction]:
             )
         )
     return _dedupe_actions(actions)
+
+
+async def plan_fixes_async(
+    report: CheckReport,
+    ecosystem: Ecosystem,
+    *,
+    config: CooldownConfig | None = None,
+    http: httpx.AsyncClient | None = None,
+    now: pendulum.DateTime | None = None,
+) -> list[FixAction]:
+    """
+    Build a fix plan, rolling back principal versions when their declared range
+    can't admit the safe transitive version.
+
+    For each transitive violation the runner:
+
+    1. Looks up the principal's installed version in ``report.checked``.
+    2. Fetches the principal's manifest at that installed version. If the
+       declared range for the transitive already accepts the safe version,
+       emits just the override (same as :func:`plan_fixes`).
+    3. Otherwise, searches for an older principal version that has cleared
+       its own cooldown and whose declared range *does* admit the safe
+       transitive. Emits both an install action for the principal rollback
+       and an override for the transitive.
+
+    If no compatible principal can be found, the violation is skipped (the
+    user can still fix it manually). Principal violations are emitted as plain
+    install actions, identical to :func:`plan_fixes`.
+    """
+    config = config or load_config(ecosystem.root, ecosystem.kind)
+    now = now or pendulum.now("UTC")
+
+    own_http = http is None
+    if own_http:
+        http = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+    assert http is not None
+    client = CachingRegistryClient(ecosystem.make_client(http))
+
+    installed_by_key: dict[tuple[str, str | None], InstalledPackage] = {
+        (p.name, p.workspace): p for p in report.checked
+    }
+
+    actions: list[FixAction] = []
+    try:
+        for v in report.violations:
+            if v.safe_version is None:
+                continue
+            if not v.via:
+                actions.append(
+                    FixAction(
+                        package=v.name,
+                        version=v.safe_version.version,
+                        workspace=v.workspace,
+                    )
+                )
+                continue
+            principal_pkg = installed_by_key.get((v.via, v.workspace))
+            if principal_pkg is None:
+                actions.append(
+                    FixAction(
+                        package=v.name,
+                        version=v.safe_version.version,
+                        workspace=v.workspace,
+                        is_override=True,
+                    )
+                )
+                continue
+
+            installed_manifest = await client.fetch_version_manifest(v.via, principal_pkg.version)
+            installed_range = installed_manifest.deps.get(v.name) if installed_manifest else None
+            if installed_range is None or ecosystem.range_satisfies(v.safe_version.version, installed_range):
+                actions.append(
+                    FixAction(
+                        package=v.name,
+                        version=v.safe_version.version,
+                        workspace=v.workspace,
+                        is_override=True,
+                    )
+                )
+                continue
+
+            principal_info = await client.fetch_package(v.via)
+            if principal_info is None:
+                logger.warning(f"Cannot roll back principal {v.via}: registry lookup failed")
+                continue
+            candidate_versions = _candidate_principal_versions(principal_info, principal_pkg.version, config, now)
+            fetched = await asyncio.gather(*(client.fetch_version_manifest(v.via, ver) for ver in candidate_versions))
+            manifests = {ver: m for ver, m in zip(candidate_versions, fetched, strict=True) if m is not None}
+            principal_safe = find_safe_principal_version(
+                principal_pkg.version,
+                principal_info,
+                manifests,
+                v.name,
+                v.safe_version,
+                ecosystem.range_satisfies,
+                config,
+                now=now,
+            )
+            if principal_safe is None:
+                logger.warning(
+                    f"Cannot roll back principal {v.via} to admit {v.name}@{v.safe_version.version}; skipping"
+                )
+                continue
+            actions.append(
+                FixAction(
+                    package=v.via,
+                    version=principal_safe.version,
+                    workspace=v.workspace,
+                )
+            )
+            actions.append(
+                FixAction(
+                    package=v.name,
+                    version=v.safe_version.version,
+                    workspace=v.workspace,
+                    is_override=True,
+                )
+            )
+    finally:
+        if own_http:
+            await http.aclose()
+
+    return _dedupe_actions(actions)
+
+
+def _candidate_principal_versions(
+    info: PackageInfo,
+    installed_version: str,
+    config: CooldownConfig,
+    now: pendulum.DateTime,
+) -> list[str]:
+    """
+    Pick the set of principal versions worth fetching manifests for.
+
+    Strict subset of ``find_safe_principal_version``'s candidate filter that
+    avoids the manifest fetch (which is only needed for the ones that survive
+    the cooldown filter).
+    """
+    from chill_out.cooldown import parse_version
+
+    current_v = parse_version(installed_version)
+    if current_v is None:
+        return []
+    out: list[str] = []
+    for ver_str, release in info.releases.items():
+        v = parse_version(ver_str)
+        if v is None or v >= current_v or v.prerelease:
+            continue
+        bump = release_type(ver_str)
+        violating, _, _ = is_within_cooldown(release.published, bump, config, now=now)
+        if violating:
+            continue
+        out.append(ver_str)
+    return out
 
 
 def _dedupe_actions(actions: Iterable[FixAction]) -> list[FixAction]:

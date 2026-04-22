@@ -15,7 +15,7 @@ from chill_out.constants import EcosystemKind, ExitCode
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.exceptions import handle_errors
 from chill_out.reporting import render_report, render_thresholds
-from chill_out.runner import check_async, plan_fixes
+from chill_out.runner import check_async, plan_fixes_async
 from chill_out.version import get_version
 
 cli = typer.Typer(
@@ -67,6 +67,11 @@ def check(
     """Check installed packages against the configured cooldown windows."""
     import asyncio
 
+    import httpx
+
+    from chill_out.constants import DEFAULT_TIMEOUT
+    from chill_out.models import CheckReport, FixAction
+
     if fix and fast:
         raise typer.BadParameter("--fix requires safe-version lookup; cannot be combined with --fast")
 
@@ -79,11 +84,19 @@ def check(
         console.print()
 
     console.print(f"Checking [bold]{eco.kind.value}[/bold] project at [dim]{root}[/dim]")
-    report = asyncio.run(check_async(eco, config=config, deep=deep, fast=fast))
+
+    async def _run() -> tuple[CheckReport, list[FixAction]]:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http:
+            report = await check_async(eco, config=config, deep=deep, fast=fast, http=http)
+            actions: list[FixAction] = []
+            if fix and report.has_violations:
+                actions = await plan_fixes_async(report, eco, config=config, http=http)
+            return report, actions
+
+    report, actions = asyncio.run(_run())
     render_report(report, console, fast=fast)
 
     if fix and report.has_violations:
-        actions = plan_fixes(report)
         if not actions:
             console.print("[yellow]No fixable violations.[/yellow]")
         else:

@@ -22,9 +22,10 @@ from chill_out.models import (
     PackageInfo,
     PackageRelease,
     SafeVersion,
+    VersionManifest,
     Violation,
 )
-from chill_out.runner import check, check_async, plan_fixes
+from chill_out.runner import check, check_async, plan_fixes, plan_fixes_async
 from chill_out.version import get_version
 
 # Library callers can opt back in via `logger.enable("chill_out")`.
@@ -52,6 +53,7 @@ __all__ = [
     "PypiEcosystem",
     "RegistryError",
     "SafeVersion",
+    "VersionManifest",
     "Violation",
     "check",
     "check_async",
@@ -62,5 +64,6 @@ __all__ = [
     "is_within_cooldown",
     "load_config",
     "plan_fixes",
+    "plan_fixes_async",
     "release_type",
 ]

@@ -57,6 +57,21 @@ class PackageInfo:
 
 
 @dataclass(frozen=True)
+class VersionManifest:
+    """
+    The dependency declarations for a single (name, version) pair.
+
+    ``deps`` maps each declared dependency name to its raw range spec, in the
+    native format of the ecosystem (e.g. ``"^2.0.0"`` for npm or
+    ``">=2.5,<3.0"`` for PyPI).
+    """
+
+    name: str
+    version: str
+    deps: dict[str, str]
+
+
+@dataclass(frozen=True)
 class SafeVersion:
     """A version older than the installed one that has cleared its cooldown window."""
 

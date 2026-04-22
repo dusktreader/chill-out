@@ -250,3 +250,82 @@ class TestNpmEcosystemLoadDeep:
         ):
             pkgs = eco.load_installed(deep=False)
         assert {p.name for p in pkgs} == {"x"}
+
+
+class TestNpmFetchVersionManifest:
+    @respx.mock
+    async def test_returns_merged_dependencies(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{NPM_REGISTRY}/foo/2.0.0").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "dependencies": {"bar": "^1.0.0"},
+                    "peerDependencies": {"baz": ">=2.0"},
+                },
+            )
+        )
+        client = NpmRegistryClient(http_client)
+        manifest = await client.fetch_version_manifest("foo", "2.0.0")
+        assert manifest is not None
+        assert manifest.deps == {"bar": "^1.0.0", "baz": ">=2.0"}
+
+    @respx.mock
+    async def test_404_returns_none(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{NPM_REGISTRY}/foo/2.0.0").mock(return_value=httpx.Response(404))
+        client = NpmRegistryClient(http_client)
+        assert await client.fetch_version_manifest("foo", "2.0.0") is None
+
+    @respx.mock
+    async def test_500_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{NPM_REGISTRY}/foo/2.0.0").mock(return_value=httpx.Response(500))
+        client = NpmRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "2.0.0")
+
+    @respx.mock
+    async def test_transport_error_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{NPM_REGISTRY}/foo/2.0.0").mock(side_effect=httpx.ConnectError("boom"))
+        client = NpmRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "2.0.0")
+
+    @respx.mock
+    async def test_non_json_raises(self, http_client: httpx.AsyncClient) -> None:
+        respx.get(f"{NPM_REGISTRY}/foo/2.0.0").mock(return_value=httpx.Response(200, content=b"not json"))
+        client = NpmRegistryClient(http_client)
+        with pytest.raises(RegistryError):
+            await client.fetch_version_manifest("foo", "2.0.0")
+
+
+class TestNpmRangeSatisfies:
+    """The npm range check shells out to node; patch subprocess.run to keep tests hermetic."""
+
+    def _eco(self, tmp_path: Path) -> NpmEcosystem:
+        (tmp_path / "package.json").write_text("{}")
+        return NpmEcosystem(tmp_path)
+
+    def test_returns_true_on_node_exit_zero(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        with patch("chill_out.ecosystems.npm.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stderr = ""
+            assert eco.range_satisfies("1.5.0", "^1.0.0") is True
+
+    def test_returns_false_on_node_exit_one(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        with patch("chill_out.ecosystems.npm.subprocess.run") as run:
+            run.return_value.returncode = 1
+            run.return_value.stderr = ""
+            assert eco.range_satisfies("2.0.0", "^1.0.0") is False
+
+    def test_falls_back_permissive_when_node_missing(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        with patch("chill_out.ecosystems.npm.subprocess.run", side_effect=FileNotFoundError):
+            assert eco.range_satisfies("1.5.0", "^1.0.0") is True
+
+    def test_falls_back_permissive_on_unexpected_exit(self, tmp_path: Path) -> None:
+        eco = self._eco(tmp_path)
+        with patch("chill_out.ecosystems.npm.subprocess.run") as run:
+            run.return_value.returncode = 2
+            run.return_value.stderr = "no semver module"
+            assert eco.range_satisfies("1.5.0", "^1.0.0") is True
