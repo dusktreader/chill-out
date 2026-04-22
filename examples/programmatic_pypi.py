@@ -53,7 +53,7 @@ def main() -> None:
 
     print(f"Checked {len(report.checked)} package(s); {len(report.violations)} violation(s).")
     for v in report.violations:
-        print(f"  - {v.name}=={v.version}  bump={v.bump.value}  age={v.age_days}d  limit={v.limit_days}d")
+        print(f"  - {v.name}=={v.version}  release_type={v.release_type.value}  age={v.age_days}d  limit={v.limit_days}d")
         if v.safe_version:
             print(f"    safe rollback: {v.safe_version.version} ({v.safe_version.age_days}d old)")
 

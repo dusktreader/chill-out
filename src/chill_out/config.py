@@ -21,24 +21,24 @@ from typing import Any
 import tomlkit
 import yaml
 
-from chill_out.constants import DEFAULT_COOLDOWN_DAYS, BumpType, EcosystemKind
+from chill_out.constants import DEFAULT_COOLDOWN_DAYS, ReleaseType, EcosystemKind
 from chill_out.exceptions import ConfigError
 
 
 @dataclass(frozen=True)
 class CooldownConfig:
     """
-    Resolved cooldown thresholds, in days, keyed by bump type.
+    Resolved cooldown thresholds, in days, keyed by release type.
 
-    `default_days` is used whenever a release's bump type is unknown or absent
+    `default_days` is used whenever a release's release type is unknown or absent
     from the explicit map.
     """
 
-    days: dict[BumpType, int] = field(default_factory=lambda: dict(DEFAULT_COOLDOWN_DAYS))
+    days: dict[ReleaseType, int] = field(default_factory=lambda: dict(DEFAULT_COOLDOWN_DAYS))
 
-    def for_bump(self, bump: BumpType) -> int:
-        """Return the threshold (days) for the given bump type, falling back to default."""
-        return self.days.get(bump, self.days.get(BumpType.DEFAULT, DEFAULT_COOLDOWN_DAYS[BumpType.DEFAULT]))
+    def for_release_type(self, rel_type: ReleaseType) -> int:
+        """Return the threshold (days) for the given release type, falling back to default."""
+        return self.days.get(rel_type, self.days.get(ReleaseType.DEFAULT, DEFAULT_COOLDOWN_DAYS[ReleaseType.DEFAULT]))
 
 
 # ---------------------------------------------------------------------------
@@ -46,31 +46,31 @@ class CooldownConfig:
 # ---------------------------------------------------------------------------
 
 
-def _coerce_days(raw: dict[str, Any]) -> dict[BumpType, int]:
-    """Map a flexible day-config dict into a typed `BumpType -> int` map."""
+def _coerce_days(raw: dict[str, Any]) -> dict[ReleaseType, int]:
+    """Map a flexible day-config dict into a typed `ReleaseType -> int` map."""
     aliases = {
-        "major": BumpType.MAJOR,
-        "minor": BumpType.MINOR,
-        "patch": BumpType.PATCH,
-        "default": BumpType.DEFAULT,
-        "semver-major-days": BumpType.MAJOR,
-        "semver-minor-days": BumpType.MINOR,
-        "semver-patch-days": BumpType.PATCH,
-        "default-days": BumpType.DEFAULT,
+        "major": ReleaseType.MAJOR,
+        "minor": ReleaseType.MINOR,
+        "patch": ReleaseType.PATCH,
+        "default": ReleaseType.DEFAULT,
+        "semver-major-days": ReleaseType.MAJOR,
+        "semver-minor-days": ReleaseType.MINOR,
+        "semver-patch-days": ReleaseType.PATCH,
+        "default-days": ReleaseType.DEFAULT,
     }
-    out: dict[BumpType, int] = {}
+    out: dict[ReleaseType, int] = {}
     for key, value in raw.items():
-        bump = aliases.get(str(key).lower())
-        if bump is None:
+        rel_type = aliases.get(str(key).lower())
+        if rel_type is None:
             continue
         try:
-            out[bump] = int(value)
+            out[rel_type] = int(value)
         except (TypeError, ValueError) as exc:
             raise ConfigError(f"Cooldown value for '{key}' must be an integer, got {value!r}") from exc
     return out
 
 
-def load_chill_out_yaml(root: Path) -> dict[BumpType, int]:
+def load_chill_out_yaml(root: Path) -> dict[ReleaseType, int]:
     """Load thresholds from a top-level ``.chill-out.yaml`` (or ``.yml``) file."""
     for name in (".chill-out.yaml", ".chill-out.yml"):
         path = root / name
@@ -87,7 +87,7 @@ def load_chill_out_yaml(root: Path) -> dict[BumpType, int]:
     return {}
 
 
-def load_pyproject_table(root: Path) -> dict[BumpType, int]:
+def load_pyproject_table(root: Path) -> dict[ReleaseType, int]:
     """Load thresholds from a ``[tool.chill-out.cooldown]`` table in pyproject.toml."""
     path = root / "pyproject.toml"
     if not path.is_file():
@@ -104,7 +104,7 @@ def load_pyproject_table(root: Path) -> dict[BumpType, int]:
     return _coerce_days(dict(cooldown))
 
 
-def load_dependabot(root: Path, ecosystem: EcosystemKind) -> dict[BumpType, int]:
+def load_dependabot(root: Path, ecosystem: EcosystemKind) -> dict[ReleaseType, int]:
     """Load thresholds from ``.github/dependabot.yml`` for the matching ecosystem."""
     path = root / ".github" / "dependabot.yml"
     if not path.is_file():
@@ -137,7 +137,7 @@ def load_config(root: Path, ecosystem: EcosystemKind) -> CooldownConfig:
         load_pyproject_table(root),
         load_chill_out_yaml(root),
     ]
-    merged: dict[BumpType, int] = {}
+    merged: dict[ReleaseType, int] = {}
     for layer in layers:
         merged.update(layer)
     return CooldownConfig(days=merged)

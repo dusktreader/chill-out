@@ -6,7 +6,7 @@ import httpx
 import pendulum
 import pytest
 from chill_out.config import CooldownConfig
-from chill_out.constants import BumpType, EcosystemKind
+from chill_out.constants import ReleaseType, EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease, VersionManifest
 from chill_out.runner import _dedupe_actions, check_async, plan_fixes
@@ -66,7 +66,7 @@ def now() -> pendulum.DateTime:
 
 @pytest.fixture
 def config() -> CooldownConfig:
-    return CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+    return CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
 
 
 class TestCheckAsync:
@@ -151,7 +151,7 @@ class TestPlanFixes:
 
         v = Violation(
             package=InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM),
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=now.subtract(days=2),
@@ -166,7 +166,7 @@ class TestPlanFixes:
 
         v = Violation(
             package=InstalledPackage(name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)),
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=now.subtract(days=2),
@@ -181,7 +181,7 @@ class TestPlanFixes:
 
         v = Violation(
             package=InstalledPackage(name="x", version="1.0.0", ecosystem=EcosystemKind.NPM),
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=now.subtract(days=2),
@@ -232,7 +232,7 @@ class TestPlanFixesAsync:
 
         return Violation(
             package=installed,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.datetime(2025, 12, 30, tz="UTC"),
@@ -380,7 +380,7 @@ class TestPlanFixesAsync:
         installed = InstalledPackage(name="x", version="1.0", ecosystem=EcosystemKind.NPM)
         v = Violation(
             package=installed,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=now.subtract(days=2),

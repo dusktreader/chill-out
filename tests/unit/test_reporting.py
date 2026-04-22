@@ -6,7 +6,7 @@ import io
 
 import pendulum
 from chill_out.config import CooldownConfig
-from chill_out.constants import BumpType, EcosystemKind
+from chill_out.constants import ReleaseType, EcosystemKind
 from chill_out.models import CheckReport, InstalledPackage, SafeVersion, Violation
 from chill_out.reporting import render_report, render_thresholds
 from rich.console import Console
@@ -20,11 +20,11 @@ def _capture(fn, *args, **kwargs) -> str:
 
 
 class TestRenderThresholds:
-    def test_lists_all_bump_types(self) -> None:
-        cfg = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+    def test_lists_all_release_types(self) -> None:
+        cfg = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         out = _capture(render_thresholds, cfg)
-        for bump in ("major", "minor", "patch", "default"):
-            assert bump in out
+        for rel_type in ("major", "minor", "patch", "default"):
+            assert rel_type in out
 
 
 class TestRenderReport:
@@ -40,7 +40,7 @@ class TestRenderReport:
         pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM)
         v = Violation(
             package=pkg,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.now("UTC"),
@@ -56,7 +56,7 @@ class TestRenderReport:
         pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM)
         v = Violation(
             package=pkg,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.now("UTC"),
@@ -70,7 +70,7 @@ class TestRenderReport:
         pkg = InstalledPackage(name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",))
         v = Violation(
             package=pkg,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.now("UTC"),

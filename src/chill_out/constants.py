@@ -17,8 +17,8 @@ class ExitCode(IntEnum):
     INTERNAL_ERROR = 99
 
 
-class BumpType(StrEnum):
-    """Semver bump category used to look up cooldown thresholds."""
+class ReleaseType(StrEnum):
+    """Classification of a single release used to look up its cooldown threshold."""
 
     MAJOR = "major"
     MINOR = "minor"
@@ -34,11 +34,11 @@ class EcosystemKind(StrEnum):
 
 
 # Default cooldown thresholds (in days) used when no config source supplies them.
-DEFAULT_COOLDOWN_DAYS: dict[BumpType, int] = {
-    BumpType.MAJOR: 30,
-    BumpType.MINOR: 10,
-    BumpType.PATCH: 7,
-    BumpType.DEFAULT: 5,
+DEFAULT_COOLDOWN_DAYS: dict[ReleaseType, int] = {
+    ReleaseType.MAJOR: 30,
+    ReleaseType.MINOR: 10,
+    ReleaseType.PATCH: 7,
+    ReleaseType.DEFAULT: 5,
 }
 
 # Conservative concurrency cap for registry HTTP requests.

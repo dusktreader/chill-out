@@ -22,9 +22,9 @@ Every source supplies the same four keys, in days:
 | `major`   | `30`    | Cooldown for major releases (`X.0.0`).    |
 | `minor`   | `10`    | Cooldown for minor releases (`X.Y.0`).    |
 | `patch`   | `7`     | Cooldown for patch releases (`X.Y.Z`).    |
-| `default` | `5`     | Used when the bump type can't be parsed.  |
+| `default` | `5`     | Used when the release type can't be parsed.  |
 
-Bump type is decided by parsing the version with semver. Pre-release versions
+Release type is decided by parsing the version with semver. Pre-release versions
 are skipped during the safe-version search.
 
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pendulum
 from chill_out import (
-    BumpType,
+    ReleaseType,
     CooldownConfig,
     PackageInfo,
     PackageRelease,
@@ -31,11 +31,11 @@ def main() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+    config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
 
-    bump = release_type("2.0.0")
-    violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), bump, config)
-    print(f"2.0.0 is {bump.value}; violating={violating}, age={age}d, limit={limit}d")
+    rel_type = release_type("2.0.0")
+    violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), rel_type, config)
+    print(f"2.0.0 is {rel_type.value}; violating={violating}, age={age}d, limit={limit}d")
 
     safe = find_safe_version("2.0.0", info, config)
     if safe:

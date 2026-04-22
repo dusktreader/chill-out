@@ -25,7 +25,7 @@ The code is organized into small, single-purpose modules under `src/chill_out/`:
 
 | Module                    | Responsibility                                              |
 |---------------------------|-------------------------------------------------------------|
-| `constants.py`            | Enums (`ExitCode`, `BumpType`, `EcosystemKind`) and defaults |
+| `constants.py`            | Enums (`ExitCode`, `ReleaseType`, `EcosystemKind`) and defaults |
 | `exceptions.py`           | `ChillOutError` hierarchy + `@handle_errors` CLI decorator  |
 | `models.py`               | Plain pydantic-free dataclasses for the domain types        |
 | `config.py`               | Layered configuration loader                                |

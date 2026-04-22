@@ -8,14 +8,14 @@ from rich.console import Console
 from rich.table import Table
 
 from chill_out.config import CooldownConfig
-from chill_out.constants import BumpType
+from chill_out.constants import ReleaseType
 from chill_out.models import CheckReport
 
-_BUMP_COLOR = {
-    BumpType.MAJOR: "red",
-    BumpType.MINOR: "yellow",
-    BumpType.PATCH: "cyan",
-    BumpType.DEFAULT: "white",
+_RELEASE_COLOR = {
+    ReleaseType.MAJOR: "red",
+    ReleaseType.MINOR: "yellow",
+    ReleaseType.PATCH: "cyan",
+    ReleaseType.DEFAULT: "white",
 }
 
 
@@ -26,11 +26,11 @@ def render_thresholds(config: CooldownConfig, console: Console) -> None:
         title_justify="left",
         header_style="bold",
     )
-    table.add_column("Bump")
+    table.add_column("Release Type")
     table.add_column("Days", justify="right")
-    for bump in (BumpType.PATCH, BumpType.MINOR, BumpType.MAJOR, BumpType.DEFAULT):
-        color = _BUMP_COLOR.get(bump, "white")
-        table.add_row(f"[{color}]{bump.value}[/{color}]", str(config.for_bump(bump)))
+    for rel_type in (ReleaseType.PATCH, ReleaseType.MINOR, ReleaseType.MAJOR, ReleaseType.DEFAULT):
+        color = _RELEASE_COLOR.get(rel_type, "white")
+        table.add_row(f"[{color}]{rel_type.value}[/{color}]", str(config.for_release_type(rel_type)))
     console.print(table)
 
 
@@ -56,7 +56,7 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
     table = Table(show_header=True, header_style="bold cyan")
     table.add_column("Package")
     table.add_column("Installed")
-    table.add_column("Bump")
+    table.add_column("Release Type")
     table.add_column("Age", justify="right")
     table.add_column("Limit", justify="right")
     if not fast:
@@ -67,11 +67,11 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
     has_via = any(v.via for v in report.violations)
 
     for v in sorted(report.violations, key=lambda x: x.name):
-        bump_color = _BUMP_COLOR.get(v.bump, "white")
+        rel_color = _RELEASE_COLOR.get(v.release_type, "white")
         row = [
             f"[bold]{v.name}[/bold]",
             v.version,
-            f"[{bump_color}]{v.bump.value}[/{bump_color}]",
+            f"[{rel_color}]{v.release_type.value}[/{rel_color}]",
             f"{v.age_days}d",
             f"{v.limit_days}d",
         ]

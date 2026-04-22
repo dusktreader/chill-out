@@ -39,12 +39,12 @@ A violation row looks roughly like this:
 
 ```text
 2 cooldown violation(s) in 14 pypi package(s):
-┌─────────────┬───────────┬──────┬──────┬───────┬───────────────────────┐
-│ Package     │ Installed │ Bump │  Age │ Limit │ Suggested safe version │
-├─────────────┼───────────┼──────┼──────┼───────┼───────────────────────┤
-│ requests    │ 2.31.0    │ minor│   3d │   10d │ 2.30.0 (45d old)      │
-│ urllib3     │ 2.0.7     │ minor│   1d │   10d │ 2.0.6 (60d old)       │
-└─────────────┴───────────┴──────┴──────┴───────┴───────────────────────┘
+┌─────────────┬───────────┬──────────────┬──────┬───────┬───────────────────────┐
+│ Package     │ Installed │ Release Type │  Age │ Limit │ Suggested safe version │
+├─────────────┼───────────┼──────────────┼──────┼───────┼───────────────────────┤
+│ requests    │ 2.31.0    │ minor        │   3d │   10d │ 2.30.0 (45d old)      │
+│ urllib3     │ 2.0.7     │ minor        │   1d │   10d │ 2.0.6 (60d old)       │
+└─────────────┴───────────┴──────────────┴──────┴───────┴───────────────────────┘
 ```
 
 The columns mean what they look like they mean. The "Suggested safe version"

@@ -71,7 +71,7 @@ def demo_01_npm_check() -> None:
     print(f"checked {len(report.checked)} package(s)")
     for v in report.violations:
         safe = v.safe_version.version if v.safe_version else "(none)"
-        print(f"  ! {v.name}@{v.version} bump={v.bump.value} safe={safe}")
+        print(f"  ! {v.name}@{v.version} release_type={v.release_type.value} safe={safe}")
 
 
 @respx.mock

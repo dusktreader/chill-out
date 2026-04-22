@@ -13,7 +13,7 @@ import pendulum
 import semver
 
 from chill_out.config import CooldownConfig
-from chill_out.constants import BumpType
+from chill_out.constants import ReleaseType
 from chill_out.models import PackageInfo, SafeVersion, VersionManifest
 
 
@@ -25,26 +25,26 @@ def parse_version(version: str) -> semver.Version | None:
         return None
 
 
-def release_type(version: str) -> BumpType:
+def release_type(version: str) -> ReleaseType:
     """
     Classify a version string as a major / minor / patch release.
 
-    A non-semver version returns ``BumpType.DEFAULT`` so callers always have a
+    A non-semver version returns ``ReleaseType.DEFAULT`` so callers always have a
     threshold to fall back on.
     """
     v = parse_version(version)
     if v is None:
-        return BumpType.DEFAULT
+        return ReleaseType.DEFAULT
     if v.minor == 0 and v.patch == 0:
-        return BumpType.MAJOR
+        return ReleaseType.MAJOR
     if v.patch == 0:
-        return BumpType.MINOR
-    return BumpType.PATCH
+        return ReleaseType.MINOR
+    return ReleaseType.PATCH
 
 
 def is_within_cooldown(
     published: pendulum.DateTime,
-    bump: BumpType,
+    rel_type: ReleaseType,
     config: CooldownConfig,
     now: pendulum.DateTime | None = None,
 ) -> tuple[bool, int, int]:
@@ -56,7 +56,7 @@ def is_within_cooldown(
     """
     now = now or pendulum.now("UTC")
     age = now - published
-    limit = config.for_bump(bump)
+    limit = config.for_release_type(rel_type)
     return age.in_days() < limit, age.in_days(), limit
 
 
@@ -82,8 +82,8 @@ def find_safe_version(
         v = parse_version(ver_str)
         if v is None or v >= current_v or v.prerelease:
             continue
-        bump = release_type(ver_str)
-        violating, _, _ = is_within_cooldown(release.published, bump, config, now=now)
+        rel_type = release_type(ver_str)
+        violating, _, _ = is_within_cooldown(release.published, rel_type, config, now=now)
         if violating:
             continue
         candidates.append((v, release.published))
@@ -140,8 +140,8 @@ def find_safe_principal_version(
         v = parse_version(ver_str)
         if v is None or v >= current_v or v.prerelease:
             continue
-        bump = release_type(ver_str)
-        violating, _, _ = is_within_cooldown(release.published, bump, config, now=now)
+        rel_type = release_type(ver_str)
+        violating, _, _ = is_within_cooldown(release.published, rel_type, config, now=now)
         if violating:
             continue
         manifest = principal_manifests.get(ver_str)

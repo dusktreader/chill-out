@@ -15,7 +15,7 @@ report = check(Path.cwd())
 
 if report.has_violations:
     for v in report.violations:
-        print(f"{v.name}=={v.version} bump={v.bump.value}")
+        print(f"{v.name}=={v.version} rel_type={v.release_type.value}")
 ```
 
 `check` is the synchronous wrapper around `check_async`. It auto-detects the
@@ -86,7 +86,7 @@ row.
 ```python
 import pendulum
 from chill_out import (
-    BumpType, CooldownConfig, PackageInfo, PackageRelease,
+    ReleaseType, CooldownConfig, PackageInfo, PackageRelease,
     find_safe_version, is_within_cooldown, release_type,
 )
 
@@ -98,10 +98,10 @@ info = PackageInfo(
         "1.5.0": PackageRelease("1.5.0", now.subtract(days=60)),
     },
 )
-config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.DEFAULT: 5})
+config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
 
-bump = release_type("2.0.0")
-violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), bump, config)
+rel_type = release_type("2.0.0")
+violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), rel_type, config)
 safe = find_safe_version("2.0.0", info, config)
 ```
 

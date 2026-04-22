@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 import pendulum
 
-from chill_out.constants import BumpType, EcosystemKind
+from chill_out.constants import ReleaseType, EcosystemKind
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ class Violation:
     """A package whose installed version has not cleared its cooldown window."""
 
     package: InstalledPackage
-    bump: BumpType
+    release_type: ReleaseType
     age_days: int
     limit_days: int
     published: pendulum.DateTime

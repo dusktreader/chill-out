@@ -53,14 +53,14 @@ async def _check_one(
         published = info.published_at(pkg.version)
         if published is None:
             return pkg, f"no publish date for {pkg.version}"
-        bump = release_type(pkg.version)
-        violating, age_days, limit_days = is_within_cooldown(published, bump, config, now=now)
+        rel_type = release_type(pkg.version)
+        violating, age_days, limit_days = is_within_cooldown(published, rel_type, config, now=now)
         if not violating:
             return pkg, None
         safe = None if fast else find_safe_version(pkg.version, info, config, now=now)
         return pkg, Violation(
             package=pkg,
-            bump=bump,
+            release_type=rel_type,
             age_days=age_days,
             limit_days=limit_days,
             published=published,
@@ -307,8 +307,8 @@ def _candidate_principal_versions(
         v = parse_version(ver_str)
         if v is None or v >= current_v or v.prerelease:
             continue
-        bump = release_type(ver_str)
-        violating, _, _ = is_within_cooldown(release.published, bump, config, now=now)
+        rel_type = release_type(ver_str)
+        violating, _, _ = is_within_cooldown(release.published, rel_type, config, now=now)
         if violating:
             continue
         out.append(ver_str)

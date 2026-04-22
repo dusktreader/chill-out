@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
-from chill_out import BumpType, CooldownConfig, PypiEcosystem, check_async
+from chill_out import ReleaseType, CooldownConfig, PypiEcosystem, check_async
 from chill_out.ecosystems.pypi import PYPI_REGISTRY
 
 
@@ -35,10 +35,10 @@ def main() -> None:
     # Strict policy: even patch releases need 14 days to settle.
     config = CooldownConfig(
         days={
-            BumpType.MAJOR: 60,
-            BumpType.MINOR: 30,
-            BumpType.PATCH: 14,
-            BumpType.DEFAULT: 14,
+            ReleaseType.MAJOR: 60,
+            ReleaseType.MINOR: 30,
+            ReleaseType.PATCH: 14,
+            ReleaseType.DEFAULT: 14,
         }
     )
 

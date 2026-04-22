@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pendulum
 from chill_out.config import CooldownConfig
-from chill_out.constants import BumpType
+from chill_out.constants import ReleaseType
 from chill_out.cooldown import find_safe_version, is_within_cooldown, parse_version, release_type
 from chill_out.models import PackageInfo, PackageRelease
 
@@ -25,31 +25,31 @@ class TestParseVersion:
 
 class TestReleaseType:
     def test_major(self) -> None:
-        assert release_type("2.0.0") is BumpType.MAJOR
+        assert release_type("2.0.0") is ReleaseType.MAJOR
 
     def test_minor(self) -> None:
-        assert release_type("2.1.0") is BumpType.MINOR
+        assert release_type("2.1.0") is ReleaseType.MINOR
 
     def test_patch(self) -> None:
-        assert release_type("2.1.3") is BumpType.PATCH
+        assert release_type("2.1.3") is ReleaseType.PATCH
 
     def test_unknown_falls_back_to_default(self) -> None:
-        assert release_type("garbage") is BumpType.DEFAULT
+        assert release_type("garbage") is ReleaseType.DEFAULT
 
 
 class TestIsWithinCooldown:
     def test_fresh_release_violates(self, fixed_now: pendulum.DateTime) -> None:
-        config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.DEFAULT: 5})
+        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
         published = fixed_now.subtract(days=2)
-        violating, age, limit = is_within_cooldown(published, BumpType.MAJOR, config, now=fixed_now)
+        violating, age, limit = is_within_cooldown(published, ReleaseType.MAJOR, config, now=fixed_now)
         assert violating is True
         assert age == 2
         assert limit == 30
 
     def test_old_release_passes(self, fixed_now: pendulum.DateTime) -> None:
-        config = CooldownConfig(days={BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+        config = CooldownConfig(days={ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         published = fixed_now.subtract(days=30)
-        violating, age, limit = is_within_cooldown(published, BumpType.PATCH, config, now=fixed_now)
+        violating, age, limit = is_within_cooldown(published, ReleaseType.PATCH, config, now=fixed_now)
         assert violating is False
         assert age == 30
         assert limit == 7
@@ -70,7 +70,7 @@ class TestFindSafeVersion:
                 "1.4.0": fixed_now.subtract(days=120),  # safe, but not newest
             }
         )
-        config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
         safe = find_safe_version("2.0.0", info, config, now=fixed_now)
         assert safe is not None
         assert safe.version == "1.5.0"
@@ -83,7 +83,7 @@ class TestFindSafeVersion:
                 "1.5.0": fixed_now.subtract(days=2),  # also too fresh
             }
         )
-        config = CooldownConfig(days={BumpType.MINOR: 30, BumpType.MAJOR: 30, BumpType.DEFAULT: 5})
+        config = CooldownConfig(days={ReleaseType.MINOR: 30, ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
         assert find_safe_version("2.0.0", info, config, now=fixed_now) is None
 
     def test_skips_prereleases(self, fixed_now: pendulum.DateTime) -> None:
@@ -94,7 +94,7 @@ class TestFindSafeVersion:
                 "1.0.0": fixed_now.subtract(days=200),
             }
         )
-        config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 30, BumpType.PATCH: 30, BumpType.DEFAULT: 5})
+        config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 30, ReleaseType.PATCH: 30, ReleaseType.DEFAULT: 5})
         safe = find_safe_version("2.0.0", info, config, now=fixed_now)
         assert safe is not None
         assert safe.version == "1.0.0"

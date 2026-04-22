@@ -5,7 +5,7 @@ chill-out — manage cooldown for package dependencies to avoid zero-day supply 
 from loguru import logger
 
 from chill_out.config import CooldownConfig, load_config
-from chill_out.constants import BumpType, EcosystemKind, ExitCode
+from chill_out.constants import ReleaseType, EcosystemKind, ExitCode
 from chill_out.cooldown import find_safe_version, is_within_cooldown, release_type
 from chill_out.ecosystems import Ecosystem, NpmEcosystem, PypiEcosystem, detect_ecosystem, get_ecosystem
 from chill_out.exceptions import (
@@ -35,7 +35,7 @@ __version__ = get_version()
 
 __all__ = [
     "__version__",
-    "BumpType",
+    "ReleaseType",
     "CheckReport",
     "ChillOutError",
     "ConfigError",

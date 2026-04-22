@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pendulum
 from chill_out import (
-    BumpType,
+    ReleaseType,
     CooldownConfig,
     PackageInfo,
     PackageRelease,
@@ -32,9 +32,9 @@ def demo_01_version() -> None:
 
 def demo_02_release_type() -> None:
     """
-    Classify a version string into a major / minor / patch bump.
+    Classify a version string into a major / minor / patch release.
 
-    `release_type` understands semver and falls back to `BumpType.DEFAULT` for
+    `release_type` understands semver and falls back to `ReleaseType.DEFAULT` for
     anything it cannot parse.
     """
     for version in ("2.0.0", "2.1.0", "2.1.3", "garbage"):
@@ -49,9 +49,9 @@ def demo_03_is_within_cooldown() -> None:
     `is_within_cooldown` returns a tuple of `(violating, age_days, limit_days)`
     so callers can render their own messaging.
     """
-    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.DEFAULT: 5})
+    config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
     published = pendulum.now("UTC").subtract(days=2)
-    violating, age, limit = is_within_cooldown(published, BumpType.MAJOR, config)
+    violating, age, limit = is_within_cooldown(published, ReleaseType.MAJOR, config)
     print(f"violating={violating}  age={age}d  limit={limit}d")
 
 
@@ -71,7 +71,7 @@ def demo_04_find_safe_version() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
+    config = CooldownConfig(days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
     safe = find_safe_version("2.0.0", info, config)
     if safe is None:
         print("no safe rollback target")

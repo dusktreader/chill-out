@@ -32,7 +32,7 @@ class TestShowConfig:
         result = CliRunner().invoke(cli, ["show-config", "--root", str(pypi_project)])
         assert result.exit_code == 0
         assert "pypi" in result.stdout
-        # Threshold table renders bump types
+        # Threshold table renders release types
         assert "patch" in result.stdout
         assert "major" in result.stdout
 
@@ -50,11 +50,11 @@ class TestCheck:
 
     def test_exits_nonzero_on_violations(self, pypi_project: Path) -> None:
         pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.PYPI)
-        from chill_out.constants import BumpType
+        from chill_out.constants import ReleaseType
 
         v = Violation(
             package=pkg,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.now("UTC"),
@@ -79,11 +79,11 @@ class TestCheck:
 
     def test_fix_invokes_apply_fixes(self, pypi_project: Path) -> None:
         pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.PYPI)
-        from chill_out.constants import BumpType
+        from chill_out.constants import ReleaseType
 
         v = Violation(
             package=pkg,
-            bump=BumpType.MAJOR,
+            release_type=ReleaseType.MAJOR,
             age_days=2,
             limit_days=30,
             published=pendulum.now("UTC"),
