@@ -447,3 +447,77 @@ class TestPlanFixesAsync:
         assert plan.actions == []
         assert len(plan.unfixable) == 1
         assert "no safe version" in plan.unfixable[0].reason
+
+    @pytest.mark.asyncio
+    async def test_intermediate_ancestor_range_triggers_rollback(self, now: pendulum.DateTime, config) -> None:
+        """A conflicting range deep in the chain (not the principal) should still trigger rollback.
+
+        Regression for the bug where the runner only checked the principal's
+        declared range. When ``principal -> middle -> child`` and ``middle``
+        is the layer that excludes the safe ``child``, the old code would
+        see no conflict at the principal level (which doesn't even mention
+        ``child``) and pin directly. The fix walks every ancestor.
+        """
+        from chill_out.models import CheckReport, SafeVersion, VersionManifest, Violation
+        from chill_out.runner import plan_fixes_async
+
+        # Three-deep chain: principal -> middle -> child.
+        principal = InstalledPackage(name="principal", version="2.0.0", ecosystem=EcosystemKind.NPM)
+        middle = InstalledPackage(
+            name="middle",
+            version="2.0.0",
+            ecosystem=EcosystemKind.NPM,
+            via_chain=("principal",),
+        )
+        child_pkg = InstalledPackage(
+            name="child",
+            version="2.0.0",
+            ecosystem=EcosystemKind.NPM,
+            # via_chain[0] is the immediate parent (middle), [-1] is the principal.
+            via_chain=("middle", "principal"),
+        )
+        v = Violation(
+            package=child_pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=now.subtract(days=2),
+            safe_version=SafeVersion("1.9.0", 100),
+        )
+
+        principal_info = PackageInfo(
+            name="principal",
+            releases={
+                "2.0.0": PackageRelease("2.0.0", now.subtract(days=1)),
+                "1.5.0": PackageRelease("1.5.0", now.subtract(days=200)),
+            },
+        )
+        manifests = {
+            # Principal doesn't declare child at all.
+            ("principal", "2.0.0"): VersionManifest("principal", "2.0.0", deps={"middle": ">=2.0"}),
+            ("principal", "1.5.0"): VersionManifest("principal", "1.5.0", deps={"middle": ">=1.0,<2.0"}),
+            # Middle is the one that excludes the safe child.
+            ("middle", "2.0.0"): VersionManifest("middle", "2.0.0", deps={"child": ">=2.0"}),
+        }
+
+        class _SemverEcosystem(_FakeEcosystem):
+            def range_satisfies(self, version, range_spec):
+                # Only ranges containing "<2.0" admit "1.9.0".
+                return "<2.0" in range_spec
+
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM,
+            checked=[principal, middle, child_pkg],
+            violations=[v],
+        )
+        eco = _SemverEcosystem(
+            packages=[principal, middle, child_pkg],
+            data={"principal": principal_info},
+            manifests=manifests,
+        )
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        # Should detect the middle-layer conflict and roll the principal back.
+        by_name = {a.package: a for a in plan.actions}
+        assert "principal" in by_name, f"expected principal rollback, got {plan.actions}"
+        assert by_name["principal"].version == "1.5.0"
+        assert by_name["child"].version == "1.9.0"

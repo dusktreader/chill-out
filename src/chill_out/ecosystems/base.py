@@ -91,3 +91,16 @@ class Ecosystem(ABC):
         declared range admits the safe transitive version.
         """
         ...
+
+    def apply_override_fixes(self, actions: list[FixAction]) -> list[str] | None:
+        """
+        Apply fixes via the ecosystem's "override every transitive copy" mechanism.
+
+        Used as a fallback when a normal direct pin doesn't dislodge a
+        violating version (typically because it stays hoisted at a parent
+        level the direct pin can't reach). Returns a list of human-readable
+        log lines on success, or ``None`` when the ecosystem doesn't support
+        an override mechanism. The default returns ``None`` so ecosystems
+        opt in by overriding.
+        """
+        return None

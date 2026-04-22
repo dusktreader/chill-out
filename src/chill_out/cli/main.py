@@ -179,6 +179,52 @@ def check(
         with progress:
             report = asyncio.run(_recheck())
         render_report(report, console, config=config, fast=fast)
+
+        # If the direct pin didn't dislodge a violating version (typical of
+        # npm's hoisting + sticky lockfile behavior), retry via the
+        # ecosystem's override mechanism. Only target violations that we
+        # actually attempted to fix on this run; anything new isn't ours to
+        # second-guess.
+        if report.has_violations and plan is not None:
+            attempted = {action.package: action.version for action in plan.actions}
+            stuck_actions = [
+                action
+                for action in plan.actions
+                if any(v.name == action.package and v.safe_version is not None for v in report.violations)
+            ]
+            if stuck_actions and eco.apply_override_fixes([]) is not None:
+                console.print()
+                console.print(
+                    f"[yellow]{len(stuck_actions)} pin(s) didn't take. "
+                    f"Falling back to {eco.kind.value} overrides...[/yellow]"
+                )
+                override_log = eco.apply_override_fixes(stuck_actions)
+                if override_log is None:
+                    console.print(f"[yellow]Override fallback unavailable for {eco.kind.value}.[/yellow]")
+                else:
+                    for line in override_log:
+                        console.print(f"  [dim]{line}[/dim]")
+                    console.print()
+                    console.print("Re-checking after override fallback...")
+                    with progress:
+                        report = asyncio.run(_recheck())
+                    render_report(report, console, config=config, fast=fast)
+                    surviving = [
+                        v
+                        for v in report.violations
+                        if v.name in attempted and v.safe_version is not None
+                    ]
+                    if surviving:
+                        console.print(
+                            f"[red]{len(surviving)} violation(s) survived both direct pin and overrides:[/red]"
+                        )
+                        for v in surviving:
+                            console.print(
+                                f"  [red]- {v.name}=={v.version}[/red]: the resolver still picked this version "
+                                "after a direct pin and an override. This usually means another tool or lockfile "
+                                "rule is forcing it. Try removing the lockfile and reinstalling, or pin the "
+                                "violating ancestor by hand."
+                            )
     elif fix_applied:
         console.print("[green]Fix complete. Re-run `chill-out check` to verify.[/green]")
 

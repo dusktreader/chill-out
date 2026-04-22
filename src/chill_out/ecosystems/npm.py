@@ -349,3 +349,42 @@ class NpmEcosystem(Ecosystem):
             raise EcosystemError(f"`npm install` failed after applying fixes: {result.stderr.strip()}")
         log.append("ran: npm install")
         return log
+
+    def apply_override_fixes(self, actions: list[FixAction]) -> list[str] | None:
+        """
+        Force transitive versions via npm's ``overrides`` field.
+
+        Direct pins in ``dependencies`` only affect what the project's own
+        code resolves to. When a violating version is hoisted at the
+        workspace-root ``node_modules`` (where a different consumer in the
+        tree pulled it in), a direct pin in a workspace-member's
+        ``package.json`` can leave that root copy untouched. ``overrides``
+        is npm's blessed mechanism for forcing one resolution everywhere
+        regardless of who declared it.
+
+        Overrides must live in the workspace root's ``package.json`` to
+        apply tree-wide, so this writes to the directory that owns the
+        lockfile rather than ``self.root`` (which may be a workspace
+        member).
+        """
+        if not actions:
+            return []
+        lock_path = self._find_lockfile()
+        workspace_root = lock_path.parent if lock_path is not None else self.root
+        root_pkg_path = workspace_root / "package.json"
+        if not root_pkg_path.is_file():
+            return None
+
+        log: list[str] = []
+        root_pkg = json.loads(root_pkg_path.read_text())
+        overrides = root_pkg.setdefault("overrides", {})
+        for action in actions:
+            overrides[action.package] = action.version
+            log.append(f"overrode {action.package} -> {action.version} (workspace root)")
+        root_pkg_path.write_text(json.dumps(root_pkg, indent=2) + "\n")
+
+        result = subprocess.run(["npm", "install"], cwd=workspace_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise EcosystemError(f"`npm install` failed after applying overrides: {result.stderr.strip()}")
+        log.append(f"ran: npm install (in {workspace_root})")
+        return log

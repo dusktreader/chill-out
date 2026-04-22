@@ -209,15 +209,16 @@ async def plan_fixes_async(
     Build a fix plan with conflict-aware principal rollback.
 
     Every violation gets pinned as a direct dependency in the project's
-    primary manifest. For transitive violations the runner first checks
-    whether pinning the safe version directly would conflict with the
-    installed principal's declared range. The flow is:
+    primary manifest. For transitive violations the runner walks every
+    ancestor in the chain (immediate parent up through the principal) and
+    checks whether any of them declares a range for the violating package
+    that excludes the safe version. The flow is:
 
     1. **Direct violation:** pin the safe version. Done.
-    2. **Transitive violation, principal range admits the safe version:**
-       pin the safe version directly. The principal stays where it is and
-       the resolver hoists the direct pin.
-    3. **Transitive violation, principal range conflicts:** search for an
+    2. **Transitive violation, no ancestor range conflicts:** pin the safe
+       version directly. The resolver hoists the direct pin and every
+       ancestor stays where it is.
+    3. **Transitive violation, an ancestor range conflicts:** search for an
        older principal version (out of cooldown, non-prerelease) whose
        declared range *does* admit the safe transitive. If found, emit pins
        for both the principal rollback and the transitive. If no compatible
@@ -225,6 +226,11 @@ async def plan_fixes_async(
        structured reason so the caller can show the user their options
        (downgrade the principal manually, raise the safe target, or wait
        out the cooldown).
+
+    The principal is the only level that always gets rolled back because
+    it's the only ancestor declared in the project's own manifest. Rolling
+    it back changes which intermediate versions the resolver picks, which
+    can clear conflicts deeper in the chain.
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
@@ -257,12 +263,32 @@ async def plan_fixes_async(
                 plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
                 continue
 
-            installed_manifest = await client.fetch_version_manifest(v.via, principal_pkg.version)
-            installed_range = installed_manifest.deps.get(v.name) if installed_manifest else None
-            if installed_range is None or ecosystem.range_satisfies(v.safe_version.version, installed_range):
-                # No conflict: a direct pin will hoist over whatever the principal asks for.
+            # Walk every ancestor in the chain (immediate parent first,
+            # principal last) and check whether any of them declares a range
+            # for this package that excludes the safe version. The earlier
+            # version of this code only checked the principal, which misses
+            # the common case where a deeply nested intermediate is the one
+            # constraining the resolution.
+            conflicting_range: str | None = None
+            for ancestor_name in v.package.via_chain:
+                ancestor_pkg = installed_by_name.get(ancestor_name)
+                if ancestor_pkg is None:
+                    continue
+                ancestor_manifest = await client.fetch_version_manifest(ancestor_name, ancestor_pkg.version)
+                ancestor_range = ancestor_manifest.deps.get(v.name) if ancestor_manifest else None
+                if ancestor_range is None:
+                    continue
+                if not ecosystem.range_satisfies(v.safe_version.version, ancestor_range):
+                    conflicting_range = ancestor_range
+                    break
+
+            if conflicting_range is None:
+                # No ancestor's range excludes the safe version. A direct pin
+                # will hoist over whatever the resolver picks for the chain.
                 plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
                 continue
+
+            installed_range = conflicting_range
 
             # Conflict: try to roll the principal back to a version whose
             # declared range admits the safe transitive.

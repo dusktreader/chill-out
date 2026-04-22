@@ -252,6 +252,52 @@ class TestNpmEcosystemApplyFixes:
         assert eco.apply_fixes([]) == []
 
 
+class TestNpmEcosystemApplyOverrideFixes:
+    def test_writes_overrides_to_package_json(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app", "dependencies": {}})
+        # Provide a lockfile so _find_lockfile resolves to tmp_path itself.
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        from chill_out.models import FixAction
+
+        fake_install = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
+            log = eco.apply_override_fixes([FixAction(package="left-pad", version="1.2.0")])
+        assert log is not None
+        new_pkg = json.loads((tmp_path / "package.json").read_text())
+        assert new_pkg["overrides"]["left-pad"] == "1.2.0"
+        assert any("overrode" in line for line in log)
+
+    def test_writes_to_workspace_root_not_member(self, tmp_path: Path) -> None:
+        # Workspace root has the lockfile; member is one level deep.
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {"name": "ws-root", "workspaces": ["api"], "dependencies": {}},
+        )
+        (tmp_path / "package-lock.json").write_text("{}")
+        member = tmp_path / "api"
+        member.mkdir()
+        _write_pkg_json(member / "package.json", {"name": "api", "dependencies": {}})
+
+        eco = NpmEcosystem(member)
+        from chill_out.models import FixAction
+
+        fake_install = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
+            eco.apply_override_fixes([FixAction(package="left-pad", version="1.2.0")])
+
+        # Override must land in the workspace ROOT package.json, not the member's.
+        root_pkg = json.loads((tmp_path / "package.json").read_text())
+        member_pkg = json.loads((member / "package.json").read_text())
+        assert root_pkg["overrides"]["left-pad"] == "1.2.0"
+        assert "overrides" not in member_pkg
+
+    def test_empty_actions_returns_empty_list(self, tmp_path: Path) -> None:
+        _write_pkg_json(tmp_path / "package.json", {"name": "app"})
+        eco = NpmEcosystem(tmp_path)
+        assert eco.apply_override_fixes([]) == []
+
+
 class TestNpmEcosystemLoadDeep:
     def test_attributes_transitives_to_principals(self, tmp_path: Path) -> None:
         _write_pkg_json(

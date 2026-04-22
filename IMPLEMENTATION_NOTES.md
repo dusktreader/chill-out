@@ -245,6 +245,67 @@ chill-out/
 ```
 
 
+## Override fallback for stuck npm pins
+
+A direct pin in `dependencies` doesn't always dislodge a violating version.
+The most common case is npm's hoisting plus a sticky lockfile: a
+workspace-member's pin lands in `<member>/node_modules/<pkg>`, but a
+different consumer in the workspace pulled in the older version, the
+resolver hoisted that older copy to the workspace root's `node_modules`,
+and the lockfile pins both. The pin is technically present but the
+violating copy still lives at the root.
+
+The CLI now handles this with a two-strategy ladder. After `--fix` and the
+verification recheck:
+
+1. If a violation our fix targeted is still present, the runner gathers
+   the corresponding `FixAction`s as "stuck pins" and asks the ecosystem
+   to apply them via its override mechanism. For npm, this writes to the
+   `overrides` field of the workspace root's `package.json` (located via
+   `_find_lockfile`, not `self.root` -- overrides only apply tree-wide
+   when set at the workspace root) and re-runs `npm install` from that
+   directory.
+2. After the second install, the runner re-checks again. Anything still
+   in violation gets called out as "survived both direct pin and
+   overrides" with an explanation pointing to manual remediation
+   (delete the lockfile and reinstall, or pin the violating ancestor
+   directly).
+
+The override fallback is opt-in per ecosystem. `Ecosystem.apply_override_fixes`
+defaults to returning `None`, and the CLI treats that as "not supported"
+and falls back to the existing manual-remediation message. pypi doesn't
+implement it (uv's `[tool.uv].override-dependencies` is conceptually
+similar but interacts with workspaces differently and isn't worth wiring
+up without a concrete failure case to verify against).
+
+Live verification on the `assess-item-analyzer` workspace exposed npm's
+deeper pathology: even with `overrides` set on the workspace root,
+`npm install` writes the override entry but doesn't always rewrite
+existing lockfile pins for hoisted copies. The package count drops
+(indicating dedupe ran), but the offending entry can persist. The
+runner's surviving-violation message exists specifically to flag this
+class so the user knows when the automated ladder has been exhausted
+and a `rm package-lock.json && npm install` is the next move.
+
+
+## Walk every ancestor for transitive conflict checking
+
+`plan_fixes_async` previously only checked the *principal*'s declared
+range when deciding whether a transitive direct-pin would conflict. For
+a deep chain like `principal -> middle -> child`, the principal's
+manifest typically doesn't even mention `child`, so the check always
+came back "no conflict" and we'd pin directly even when the middle
+layer had a range that excluded the safe version.
+
+The fix walks every entry in `via_chain` (immediate parent first,
+principal last) and asks each ancestor's installed manifest whether it
+declares a range for the violating package. The first conflicting
+range we find triggers the principal-rollback flow. The principal stays
+the rollback target (it's the only ancestor we can edit through the
+project's own manifest), but the conflict-detection now sees the actual
+constraint structure.
+
+
 ## What is not done
 
 A few things from the original script were intentionally deferred:

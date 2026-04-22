@@ -189,7 +189,15 @@ def render_report(
     )
 
     has_via = any(v.via for v in report.violations)
-    installed_index = {p.name: p for p in report.checked}
+    # Multiple installations can share a name (different versions hoisted at
+    # different nesting levels). Group by name and prefer the shallowest
+    # entry — typically the one closest to the project root, which is the
+    # version display picks for unattributed intermediates in the chain.
+    installed_index: dict[str, InstalledPackage] = {}
+    for p in report.checked:
+        existing = installed_index.get(p.name)
+        if existing is None or len(p.via_chain) < len(existing.via_chain):
+            installed_index[p.name] = p
 
     table = Table(show_header=True, header_style="bold cyan", show_lines=has_via)
     table.add_column("Package", min_width=40)
