@@ -129,24 +129,37 @@ class NpmEcosystem(Ecosystem):
 
     def _load_direct(self) -> list[InstalledPackage]:
         dep_names = self._read_root_package_json()
-        data = self._npm_list(depth=1)
+        # Use the full tree because workspace members appear as `file:`-resolved
+        # top-level entries; their actual installed deps are nested one level
+        # deeper. Descending into those nodes lets a workspace member find its
+        # own declared deps even when npm-list is rooted at the workspace.
+        data = self._npm_list(depth=None)
 
         packages: dict[str, InstalledPackage] = {}
 
-        for name, info in (data.get("dependencies") or {}).items():
-            if name not in dep_names:
-                continue
-            if str(info.get("resolved", "")).startswith("file:"):
-                continue
-            version = info.get("version")
-            if not version:
-                continue
-            if name not in packages:
-                packages[name] = InstalledPackage(
-                    name=name,
-                    version=version,
-                    ecosystem=self.kind,
-                )
+        def collect(node: dict[str, Any], descend_workspace: bool) -> None:
+            for name, info in (node.get("dependencies") or {}).items():
+                resolved = str(info.get("resolved", ""))
+                is_workspace_member = resolved.startswith("file:")
+                if is_workspace_member:
+                    # Don't report the workspace member itself; descend into
+                    # its deps to find the ones declared by THIS project.
+                    if descend_workspace:
+                        collect(info, descend_workspace=False)
+                    continue
+                if name not in dep_names:
+                    continue
+                version = info.get("version")
+                if not version:
+                    continue
+                if name not in packages:
+                    packages[name] = InstalledPackage(
+                        name=name,
+                        version=version,
+                        ecosystem=self.kind,
+                    )
+
+        collect(data, descend_workspace=True)
 
         return list(packages.values())
 

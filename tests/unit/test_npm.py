@@ -128,6 +128,66 @@ class TestNpmEcosystemLoadDirect:
         with patch.object(NpmEcosystem, "_npm_list", return_value=fake):
             assert eco.load_installed(deep=False) == []
 
+    def test_descends_into_workspace_member_to_find_declared_deps(self, tmp_path: Path) -> None:
+        # When chill-out runs inside a workspace member, `npm list` walks up to
+        # the workspace root and reports the member as a file:-resolved entry
+        # with the member's actual deps nested one level deeper. The backend
+        # has to descend into that node to match against the local
+        # package.json's declared deps.
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {"name": "api", "dependencies": {"left-pad": "^1.0.0", "right-pad": "^2.0.0"}},
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake_npm_list = {
+            "dependencies": {
+                "@workspace/api": {
+                    "version": "1.0.0",
+                    "resolved": "file:../../api",
+                    "dependencies": {
+                        "left-pad": {"version": "1.3.0"},
+                        "right-pad": {"version": "2.5.0"},
+                        "untracked-transitive": {"version": "9.9.9"},
+                    },
+                },
+            }
+        }
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake_npm_list):
+            pkgs = eco.load_installed(deep=False)
+        names = {p.name for p in pkgs}
+        # Both declared deps come back; the unrelated transitive does not, and
+        # the workspace member itself is never reported.
+        assert names == {"left-pad", "right-pad"}
+
+    def test_does_not_descend_through_nested_workspace_members(self, tmp_path: Path) -> None:
+        # Only the first-level descent into a file:-resolved node should
+        # happen; deeper nesting is the resolver's transitive territory and
+        # belongs in --deep, not direct mode.
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {"name": "api", "dependencies": {"left-pad": "^1"}},
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake_npm_list = {
+            "dependencies": {
+                "@workspace/api": {
+                    "resolved": "file:../api",
+                    "dependencies": {
+                        "@workspace/inner": {
+                            "resolved": "file:../inner",
+                            "dependencies": {
+                                "left-pad": {"version": "1.3.0"},
+                            },
+                        },
+                    },
+                },
+            }
+        }
+        with patch.object(NpmEcosystem, "_npm_list", return_value=fake_npm_list):
+            pkgs = eco.load_installed(deep=False)
+        # left-pad lives two workspace-hops deep; we don't try to track that.
+        assert pkgs == []
+
 
 class TestNpmEcosystemNpmList:
     def test_raises_on_unexpected_exit(self, tmp_path: Path) -> None:

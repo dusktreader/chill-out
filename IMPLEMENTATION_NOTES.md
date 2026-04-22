@@ -143,6 +143,20 @@ requirer for whatever `bar` itself depends on. The graph also reads from
 `optionalDependencies` in addition to `dependencies` and `peerDependencies`
 so optional transitives still get attributed correctly.
 
+### npm workspace-member descent
+
+Even in non-deep mode, running chill-out from inside a workspace member is
+common, and `npm list` always walks up to the workspace root before reporting.
+That means the local project's directly-declared deps don't show up at the top
+of the npm-list tree; they appear nested one level deeper, under a
+`file:`-resolved entry that represents the workspace member itself.
+
+The direct-mode loader handles this by descending one level into any
+`file:`-resolved top-level entry and matching that node's `dependencies`
+against the local `package.json`'s declared names. Deeper nesting (workspaces
+inside workspaces) is treated as transitive territory and stays out of direct
+mode. The workspace member's own entry is never reported as a package.
+
 ### Registry caching
 
 `CachingRegistryClient` wraps any `RegistryClient` with a per-process,
