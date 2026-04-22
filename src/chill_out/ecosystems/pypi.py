@@ -9,6 +9,7 @@ fixes by editing ``pyproject.toml`` to pin versions and re-running ``uv lock``.
 
 from __future__ import annotations
 
+import glob
 import json
 import subprocess
 from pathlib import Path
@@ -25,7 +26,14 @@ from packaging.version import InvalidVersion, Version
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
-from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease, VersionManifest
+from chill_out.models import (
+    FixAction,
+    InstalledPackage,
+    PackageInfo,
+    PackageRelease,
+    VersionManifest,
+    WorkspaceTopology,
+)
 
 PYPI_REGISTRY = "https://pypi.org/pypi"
 
@@ -284,6 +292,77 @@ class PypiEcosystem(Ecosystem):
     # Fix application
     # ------------------------------------------------------------------
 
+    def workspace_topology(self) -> WorkspaceTopology | None:
+        """
+        Detect a uv workspace by walking up to find a ``pyproject.toml`` with ``[tool.uv.workspace]``.
+
+        Starts at ``self.root`` and walks toward the filesystem root until
+        it finds a ``pyproject.toml`` declaring ``[tool.uv.workspace]``.
+        Reads ``members`` (glob patterns) and ``exclude``, expands the
+        globs, and returns a :class:`WorkspaceTopology` keyed by each
+        member's ``project.name``.
+
+        Returns ``None`` when no workspace declaration is reachable from
+        ``self.root``.
+        """
+        cur = self.root.resolve()
+        ws_doc: dict[str, Any] | None = None
+        ws_root: Path | None = None
+        while True:
+            candidate = cur / "pyproject.toml"
+            if candidate.is_file():
+                try:
+                    doc = tomlkit.parse(candidate.read_text())
+                except Exception:
+                    doc = None
+                if doc is not None:
+                    ws = (
+                        doc.get("tool", {}) if isinstance(doc.get("tool"), dict) else {}
+                    ).get("uv", {})
+                    if isinstance(ws, dict) and isinstance(ws.get("workspace"), dict):
+                        ws_doc = ws["workspace"]
+                        ws_root = cur
+                        break
+            if cur == cur.parent:
+                break
+            cur = cur.parent
+
+        if ws_doc is None or ws_root is None:
+            return None
+
+        members_field = ws_doc.get("members") or []
+        exclude_field = ws_doc.get("exclude") or []
+        excluded: set[Path] = set()
+        for pattern in exclude_field:
+            for match in glob.glob(str(ws_root / pattern)):
+                excluded.add(Path(match).resolve())
+
+        members: dict[str, Path] = {}
+        for pattern in members_field:
+            for match in glob.glob(str(ws_root / pattern)):
+                member_dir = Path(match)
+                if not member_dir.is_dir():
+                    continue
+                if member_dir.resolve() in excluded:
+                    continue
+                member_pyproject = member_dir / "pyproject.toml"
+                if not member_pyproject.is_file():
+                    continue
+                try:
+                    member_doc = tomlkit.parse(member_pyproject.read_text())
+                except Exception:
+                    continue
+                project = member_doc.get("project") if isinstance(member_doc.get("project"), dict) else None
+                if not project:
+                    continue
+                name = project.get("name")
+                if not name:
+                    continue
+                members[_normalize(str(name))] = member_dir
+        if not members:
+            return None
+        return WorkspaceTopology(root=ws_root, members=members)
+
     def range_satisfies(self, version: str, range_spec: str) -> bool:
         """
         Return True if ``version`` satisfies a PEP 440 ``range_spec``.
@@ -309,8 +388,31 @@ class PypiEcosystem(Ecosystem):
         return spec.contains(parsed, prereleases=True)
 
     def apply_fixes(self, actions: list[FixAction]) -> list[str]:
+        """Apply pins. Routes ``via_overrides`` actions through ``apply_override_fixes``.
+
+        Direct pins are written into ``self.root``'s ``pyproject.toml`` and
+        validated with ``uv lock``. Override pins go through the workspace
+        root's ``[tool.uv].override-dependencies`` field and trigger a
+        workspace-wide ``uv lock`` to recompute the resolution.
+        """
         if not actions:
             return []
+        direct_actions = [a for a in actions if not a.via_overrides]
+        override_actions = [a for a in actions if a.via_overrides]
+
+        log: list[str] = []
+        if direct_actions:
+            log.extend(self._apply_direct_fixes(direct_actions))
+        if override_actions:
+            override_log = self.apply_override_fixes(override_actions)
+            if override_log is None:
+                logger.warning("override path unavailable; falling back to direct pins for shared actions")
+                log.extend(self._apply_direct_fixes(override_actions))
+            else:
+                log.extend(override_log)
+        return log
+
+    def _apply_direct_fixes(self, actions: list[FixAction]) -> list[str]:
         path = self.root / "pyproject.toml"
         EcosystemError.require_condition(path.is_file(), f"No pyproject.toml at {path}")
         doc = tomlkit.parse(path.read_text())
@@ -333,6 +435,67 @@ class PypiEcosystem(Ecosystem):
         if result.returncode != 0:
             raise EcosystemError(f"`uv lock` failed after applying fixes: {result.stderr.strip()}")
         log.append("ran: uv lock")
+        return log
+
+    def supports_overrides(self) -> bool:
+        return True
+
+    def apply_override_fixes(self, actions: list[FixAction]) -> list[str] | None:
+        """
+        Force transitive versions via uv's ``override-dependencies`` mechanism.
+
+        Writes one entry per action to ``[tool.uv].override-dependencies``
+        in the workspace root's ``pyproject.toml`` (or ``self.root`` when
+        there's no workspace), then runs ``uv lock`` from that directory
+        to recompute the workspace-wide resolution. Returns the log on
+        success, or ``None`` when no usable workspace root could be
+        located.
+        """
+        if not actions:
+            return []
+        topology = self.workspace_topology()
+        write_root = topology.root if topology is not None else self.root
+        path = write_root / "pyproject.toml"
+        if not path.is_file():
+            return None
+
+        doc = tomlkit.parse(path.read_text())
+        tool = doc.setdefault("tool", tomlkit.table())
+        uv_section = tool.setdefault("uv", tomlkit.table())
+        overrides = uv_section.get("override-dependencies")
+        if overrides is None:
+            overrides = tomlkit.array()
+            uv_section["override-dependencies"] = overrides
+
+        log: list[str] = []
+        # Drop any existing entries we're replacing so we don't accumulate
+        # duplicate pins on re-runs.
+        existing_specs = list(overrides)
+        kept: list[str] = []
+        for raw in existing_specs:
+            try:
+                req = Requirement(str(raw))
+                replaced = any(_normalize(req.name) == _normalize(a.package) for a in actions)
+            except InvalidRequirement:
+                replaced = False
+            if not replaced:
+                kept.append(str(raw))
+        # Rebuild the array in place.
+        while len(overrides) > 0:
+            overrides.pop()
+        for raw in kept:
+            overrides.append(raw)
+        for action in actions:
+            spec = f"{action.package}=={action.version}"
+            overrides.append(spec)
+            log.append(f"overrode {spec} (workspace root)")
+
+        path.write_text(tomlkit.dumps(doc))
+
+        result = subprocess.run(["uv", "lock"], cwd=write_root, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise EcosystemError(f"`uv lock` failed after applying overrides: {result.stderr.strip()}")
+        log.append(f"ran: uv lock (in {write_root})")
         return log
 
 

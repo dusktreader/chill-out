@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 
 from chill_out.constants import EcosystemKind
-from chill_out.models import FixAction, InstalledPackage, PackageInfo, VersionManifest
+from chill_out.models import FixAction, InstalledPackage, PackageInfo, VersionManifest, WorkspaceTopology
 
 
 class RegistryClient(ABC):
@@ -92,6 +92,15 @@ class Ecosystem(ABC):
         """
         ...
 
+    def supports_overrides(self) -> bool:
+        """
+        Return True if this ecosystem implements an override mechanism.
+
+        The default returns False; ecosystems that override
+        :meth:`apply_override_fixes` should also override this to return True.
+        """
+        return False
+
     def apply_override_fixes(self, actions: list[FixAction]) -> list[str] | None:
         """
         Apply fixes via the ecosystem's "override every transitive copy" mechanism.
@@ -102,5 +111,17 @@ class Ecosystem(ABC):
         log lines on success, or ``None`` when the ecosystem doesn't support
         an override mechanism. The default returns ``None`` so ecosystems
         opt in by overriding.
+        """
+        return None
+
+    def workspace_topology(self) -> WorkspaceTopology | None:
+        """
+        Detect a multi-member workspace and return its layout.
+
+        Returns ``None`` for standalone (single-root) projects or when no
+        workspace declaration is present. Workspace-aware ecosystems
+        override this to parse the appropriate manifest field (``workspaces``
+        in npm's ``package.json``, ``[tool.uv.workspace]`` in uv's
+        ``pyproject.toml``).
         """
         return None

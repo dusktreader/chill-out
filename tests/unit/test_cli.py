@@ -96,6 +96,10 @@ class TestCheck:
                 "chill_out.ecosystems.pypi.PypiEcosystem.apply_fixes",
                 return_value=["pinned x -> 1.5.0", "ran: uv lock"],
             ) as apply_mock,
+            patch(
+                "chill_out.ecosystems.pypi.PypiEcosystem.apply_override_fixes",
+                return_value=["overrode x==1.5.0 (workspace root)", "ran: uv lock"],
+            ),
         ):
             result = CliRunner().invoke(cli, ["check", "--root", str(pypi_project), "--fix"])
         assert apply_mock.called

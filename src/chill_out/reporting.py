@@ -135,6 +135,11 @@ def _build_strategy(violation: Violation) -> Tree | str:
     pin to apply. When no safe version is known, returns a dim 'none' marker
     so the column still has something to show.
 
+    When the violation is shared across multiple workspace members, the
+    strategy includes an annotation listing the members. That signals to
+    the user (and to the fix planner) that a member-level pin will leave
+    the sibling-shared copy in place and an override is the right move.
+
     This is a display-only summary. The actual fix may also need to roll back
     the principal when the safe transitive version conflicts with whatever
     the principal's range admits; that decision lives in the planner and
@@ -144,6 +149,9 @@ def _build_strategy(violation: Violation) -> Tree | str:
         return "[dim]no safe version found[/dim]"
 
     pin_label = _fmt_pin(violation.name, violation.safe_version.version, violation.safe_version.age_days)
+    if violation.is_shared:
+        owners = ", ".join(violation.member_owners)
+        pin_label = f"{pin_label} [yellow](shared: {owners}; will use overrides)[/yellow]"
 
     if not violation.package.via_chain:
         return pin_label

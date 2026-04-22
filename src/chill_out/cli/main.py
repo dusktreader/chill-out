@@ -192,7 +192,7 @@ def check(
                 for action in plan.actions
                 if any(v.name == action.package and v.safe_version is not None for v in report.violations)
             ]
-            if stuck_actions and eco.apply_override_fixes([]) is not None:
+            if stuck_actions and eco.supports_overrides():
                 console.print()
                 console.print(
                     f"[yellow]{len(stuck_actions)} pin(s) didn't take. "

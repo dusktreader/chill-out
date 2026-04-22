@@ -5,6 +5,7 @@ Shared dataclasses representing packages, registry data, violations, and fix act
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pendulum
 
@@ -26,10 +27,26 @@ class InstalledPackage:
     The first element is the immediate parent, the last is the principal.
     """
 
+    member_owners: tuple[str, ...] = ()
+    """
+    Names of workspace members whose dependency subtree includes this installation.
+
+    Empty tuple in single-project (non-workspace) mode. In a workspace, this
+    lists every member that pulls the package in (directly or transitively).
+    More than one entry means the version is shared across siblings -- a
+    direct pin in any single member's manifest may not dislodge it because
+    the others still need it.
+    """
+
     @property
     def via(self) -> str | None:
         """The principal dependency at the top of the chain, if this is a transitive dep."""
         return self.via_chain[-1] if self.via_chain else None
+
+    @property
+    def is_shared(self) -> bool:
+        """True when more than one workspace member pulls this installation in."""
+        return len(self.member_owners) > 1
 
 
 @dataclass(frozen=True)
@@ -99,6 +116,16 @@ class Violation:
     def via(self) -> str | None:
         return self.package.via
 
+    @property
+    def is_shared(self) -> bool:
+        """True when the underlying installation is shared across workspace members."""
+        return self.package.is_shared
+
+    @property
+    def member_owners(self) -> tuple[str, ...]:
+        """Workspace members that pull this installation in (empty for non-workspace projects)."""
+        return self.package.member_owners
+
 
 @dataclass(frozen=True)
 class FixAction:
@@ -108,10 +135,30 @@ class FixAction:
     ``package`` to ``version`` written to the project's primary manifest
     (``project.dependencies`` for pypi, ``dependencies`` for npm). Transitive
     pins ride along as direct entries; the ecosystem resolver hoists them.
+
+    When ``via_overrides`` is True the pin should be applied via the
+    ecosystem's "force every transitive copy" mechanism instead of a direct
+    dependency entry. The runner sets this for shared transitive
+    violations in workspace contexts where a member-level direct pin
+    cannot dislodge a sibling-shared copy.
     """
 
     package: str
     version: str
+    via_overrides: bool = False
+
+
+@dataclass(frozen=True)
+class WorkspaceTopology:
+    """Layout of a multi-member workspace.
+
+    ``root`` is the directory that owns the lockfile and is the right place
+    to apply tree-wide overrides. ``members`` maps each member's declared
+    package name to its directory.
+    """
+
+    root: Path
+    members: dict[str, Path]
 
 
 @dataclass(frozen=True)

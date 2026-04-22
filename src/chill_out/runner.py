@@ -243,6 +243,19 @@ async def plan_fixes_async(
 
     installed_by_name: dict[str, InstalledPackage] = {p.name: p for p in report.checked}
 
+    def pin(v: Violation, version: str) -> FixAction:
+        """Build the right kind of pin for this violation.
+
+        Shared transitive violations (multiple workspace members pull the
+        same install in) need an override-style pin because a member-level
+        ``dependencies`` entry can't dislodge a sibling-shared copy. Direct
+        violations on the current project's own manifest stay as plain pins
+        even when the package happens to be shared, since the user
+        explicitly declared it here.
+        """
+        use_overrides = v.is_shared and bool(v.via)
+        return FixAction(package=v.name, version=version, via_overrides=use_overrides)
+
     plan = FixPlan()
     try:
         for v in report.violations:
@@ -252,7 +265,7 @@ async def plan_fixes_async(
                 )
                 continue
             if not v.via:
-                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+                plan.actions.append(pin(v, v.safe_version.version))
                 continue
 
             principal_pkg = installed_by_name.get(v.via)
@@ -260,7 +273,7 @@ async def plan_fixes_async(
                 # Principal not in the installed set (rare, but possible if the
                 # via attribution races against a manifest edit). Pin the
                 # transitive directly; the resolver will figure it out.
-                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+                plan.actions.append(pin(v, v.safe_version.version))
                 continue
 
             # Walk every ancestor in the chain (immediate parent first,
@@ -285,7 +298,7 @@ async def plan_fixes_async(
             if conflicting_range is None:
                 # No ancestor's range excludes the safe version. A direct pin
                 # will hoist over whatever the resolver picks for the chain.
-                plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+                plan.actions.append(pin(v, v.safe_version.version))
                 continue
 
             installed_range = conflicting_range

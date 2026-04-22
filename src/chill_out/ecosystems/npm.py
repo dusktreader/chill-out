@@ -9,6 +9,7 @@ transitive) into ``dependencies``, then re-running ``npm install``.
 
 from __future__ import annotations
 
+import glob
 import json
 import subprocess
 from pathlib import Path
@@ -21,7 +22,14 @@ from loguru import logger
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
-from chill_out.models import FixAction, InstalledPackage, PackageInfo, PackageRelease, VersionManifest
+from chill_out.models import (
+    FixAction,
+    InstalledPackage,
+    PackageInfo,
+    PackageRelease,
+    VersionManifest,
+    WorkspaceTopology,
+)
 
 NPM_REGISTRY = "https://registry.npmjs.org"
 
@@ -166,6 +174,15 @@ class NpmEcosystem(Ecosystem):
     def _load_all(self) -> list[InstalledPackage]:
         data = self._npm_list(depth=None)
 
+        # Compute cross-member ownership before scoping. When npm list is
+        # rooted at a workspace, each top-level entry is a workspace member
+        # and its subtree contains everything that member pulls in. Build a
+        # (name, version) -> set[member_name] index so we can tag each
+        # installation with the members that share it. In a non-workspace
+        # context this index is empty and member_owners stays the empty
+        # tuple.
+        ownership = self._compute_member_ownership(data)
+
         # If we're inside a workspace member, npm list walks up to the
         # workspace root and reports every member's tree. Scope down to just
         # this member's subtree so we don't surface (and try to fix) packages
@@ -196,17 +213,104 @@ class NpmEcosystem(Ecosystem):
                     # ancestor path (immediate parent first, principal last)
                     # as its via_chain.
                     via_chain: tuple[str, ...] = tuple(reversed(chain))
+                    owners = tuple(sorted(ownership.get(key, set())))
                     packages[key] = InstalledPackage(
                         name=name,
                         version=version,
                         ecosystem=self.kind,
                         via_chain=via_chain,
+                        member_owners=owners,
                     )
                 collect(info, chain + (name,))
 
         collect(data, ())
 
         return list(packages.values())
+
+    def _compute_member_ownership(self, root_data: dict[str, Any]) -> dict[tuple[str, str], set[str]]:
+        """
+        Build a (name, version) -> set of workspace-member names that pull it in.
+
+        When ``root_data`` is the npm-list output rooted at a workspace, each
+        top-level entry whose ``resolved`` field starts with ``file:`` is a
+        workspace member. Walk into each such subtree separately and attribute
+        every reachable (name, version) pair to that member. A package that
+        appears in two members' subtrees ends up with both names in its set.
+
+        Returns an empty dict when there's no workspace (no ``file:``-resolved
+        top-level entries).
+        """
+        ownership: dict[tuple[str, str], set[str]] = {}
+        for member_name, info in (root_data.get("dependencies") or {}).items():
+            resolved = str(info.get("resolved", ""))
+            if not resolved.startswith("file:"):
+                continue
+
+            def walk(node: dict[str, Any], owner: str) -> None:
+                for name, child in (node.get("dependencies") or {}).items():
+                    version = child.get("version")
+                    if not version:
+                        continue
+                    ownership.setdefault((name, version), set()).add(owner)
+                    walk(child, owner)
+
+            walk(info, member_name)
+        return ownership
+
+    def workspace_topology(self) -> WorkspaceTopology | None:
+        """
+        Detect an npm workspace by reading the lockfile-rooted ``package.json``.
+
+        Walks up to find the workspace root (the directory that owns the
+        lockfile, which may be ``self.root`` itself or an ancestor for a
+        member project). If the root's ``package.json`` declares a
+        ``workspaces`` field, expand the globs against the root directory
+        and read each member's ``name`` from its own ``package.json``.
+
+        Returns ``None`` when there's no lockfile, no ``workspaces`` field,
+        or none of the globs resolve to a directory with a readable
+        ``package.json``.
+        """
+        lock_path = self._find_lockfile()
+        workspace_root = lock_path.parent if lock_path is not None else self.root
+        root_pkg_path = workspace_root / "package.json"
+        if not root_pkg_path.is_file():
+            return None
+        try:
+            root_doc = json.loads(root_pkg_path.read_text())
+        except json.JSONDecodeError:
+            return None
+        ws_field = root_doc.get("workspaces")
+        # npm accepts either ["pkgs/*"] or {"packages": ["pkgs/*"]}.
+        if isinstance(ws_field, dict):
+            patterns = ws_field.get("packages") or []
+        elif isinstance(ws_field, list):
+            patterns = ws_field
+        else:
+            return None
+        if not patterns:
+            return None
+
+        members: dict[str, Path] = {}
+        for pattern in patterns:
+            for match in glob.glob(str(workspace_root / pattern)):
+                member_dir = Path(match)
+                if not member_dir.is_dir():
+                    continue
+                member_pkg = member_dir / "package.json"
+                if not member_pkg.is_file():
+                    continue
+                try:
+                    member_doc = json.loads(member_pkg.read_text())
+                except json.JSONDecodeError:
+                    continue
+                name = member_doc.get("name")
+                if not name:
+                    continue
+                members[name] = member_dir
+        if not members:
+            return None
+        return WorkspaceTopology(root=workspace_root, members=members)
 
     def _find_workspace_member(self, data: dict[str, Any]) -> dict[str, Any] | None:
         """
@@ -329,8 +433,39 @@ class NpmEcosystem(Ecosystem):
         return True
 
     def apply_fixes(self, actions: list[FixAction]) -> list[str]:
+        """Apply pins. Routes ``via_overrides`` actions through ``apply_override_fixes``.
+
+        Splits the incoming actions into two groups based on the
+        ``via_overrides`` flag, which the planner sets for shared
+        transitive violations in workspace contexts. Direct pins land in
+        ``self.root``'s ``package.json`` ``dependencies`` as before;
+        override pins go through the workspace-root override path. Both
+        groups trigger their own ``npm install`` so the ordering is:
+        write direct pins, ``npm install`` from member, then write
+        overrides at the workspace root, ``npm install`` from there.
+        """
         if not actions:
             return []
+        direct_actions = [a for a in actions if not a.via_overrides]
+        override_actions = [a for a in actions if a.via_overrides]
+
+        log: list[str] = []
+        if direct_actions:
+            log.extend(self._apply_direct_fixes(direct_actions))
+        if override_actions:
+            override_log = self.apply_override_fixes(override_actions)
+            if override_log is None:
+                # Workspace root not present (shouldn't happen if planner
+                # tagged via_overrides, but stay defensive). Fall back to
+                # direct pinning so the action isn't lost silently.
+                logger.warning("override path unavailable; falling back to direct pins for shared actions")
+                log.extend(self._apply_direct_fixes(override_actions))
+            else:
+                log.extend(override_log)
+        return log
+
+    def _apply_direct_fixes(self, actions: list[FixAction]) -> list[str]:
+        """Pin a list of direct-style actions into ``self.root/package.json``."""
         log: list[str] = []
         root_pkg_path = self.root / "package.json"
         EcosystemError.require_condition(root_pkg_path.is_file(), f"No package.json at project root: {root_pkg_path}")
@@ -349,6 +484,9 @@ class NpmEcosystem(Ecosystem):
             raise EcosystemError(f"`npm install` failed after applying fixes: {result.stderr.strip()}")
         log.append("ran: npm install")
         return log
+
+    def supports_overrides(self) -> bool:
+        return True
 
     def apply_override_fixes(self, actions: list[FixAction]) -> list[str] | None:
         """
