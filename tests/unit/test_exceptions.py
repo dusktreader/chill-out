@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
 import typer
-from typer.testing import CliRunner
-
 from chill_out.constants import ExitCode
 from chill_out.exceptions import ChillOutError, ConfigError, handle_errors
+from typer.testing import CliRunner
 
 
 class TestChillOutError:

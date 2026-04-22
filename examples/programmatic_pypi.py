@@ -19,7 +19,6 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
-
 from chill_out import PypiEcosystem, check_async, plan_fixes
 from chill_out.ecosystems.pypi import PYPI_REGISTRY
 
@@ -46,10 +45,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as raw_tmp:
         root = Path(raw_tmp)
         (root / "pyproject.toml").write_text(
-            '[project]\n'
-            'name = "demo"\n'
-            'version = "0.1.0"\n'
-            'dependencies = ["example-pkg==2.0.0"]\n'
+            '[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = ["example-pkg==2.0.0"]\n'
         )
 
         ecosystem = PypiEcosystem(root)

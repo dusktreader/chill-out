@@ -5,7 +5,6 @@ from __future__ import annotations
 import httpx
 import pendulum
 import pytest
-
 from chill_out.config import CooldownConfig
 from chill_out.constants import BumpType, EcosystemKind
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
@@ -53,9 +52,7 @@ def now() -> pendulum.DateTime:
 
 @pytest.fixture
 def config() -> CooldownConfig:
-    return CooldownConfig(
-        days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5}
-    )
+    return CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
 
 
 class TestCheckAsync:
@@ -154,9 +151,7 @@ class TestPlanFixes:
         from chill_out.models import CheckReport, SafeVersion, Violation
 
         v = Violation(
-            package=InstalledPackage(
-                name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)
-            ),
+            package=InstalledPackage(name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)),
             bump=BumpType.MAJOR,
             age_days=2,
             limit_days=30,

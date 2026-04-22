@@ -1,19 +1,24 @@
+# Configuration for chill-out documentation (rendered with zensical)
+#
+# Zensical reads mkdocs-style configuration; the build is driven by:
+#
+#     uv run --project docs zensical build --config-file=docs/mkdocs.yaml
+#
+# See ./pyproject.toml for the docs-only dependency set.
+
 site_name: chill-out documentation
-site_url: http://dusktreader.github.io/chill-out
+site_url: https://dusktreader.github.io/chill-out
 repo_url: https://github.com/dusktreader/chill-out
 docs_dir: source
 theme:
   name: material
   features:
     - navigation.expand
-    - content.code.copy
-  font:
-    code: Fira Code
-  features:
-    - navigation.expand
     - navigation.footer
     - navigation.tracking
     - content.code.copy
+  font:
+    code: Fira Code
   icon:
     repo: fontawesome/brands/github
   palette:
@@ -27,13 +32,18 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to light mode
-watch:
-  - ../src/chill_out
 nav:
   - Home: index.md
   - Quickstart: quickstart.md
-  - Features: features.md
+  - Configuration: configuration.md
+  - Ecosystems: ecosystems.md
+  - CLI: cli.md
+  - Programmatic API: api.md
   - Reference: reference.md
+watch:
+  - source/
+  - ../src/chill_out
+  - ../examples
 plugins:
   search:
     lang: en
@@ -50,6 +60,8 @@ plugins:
           show_source: false
           docstring_style: google
 markdown_extensions:
+  - admonition:
+  - attr_list:
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -58,5 +70,3 @@ markdown_extensions:
   - pymdownx.snippets:
   - pymdownx.superfences:
   - pymdownx.details:
-  - admonition:
-  - attr_list:

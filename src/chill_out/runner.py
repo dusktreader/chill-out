@@ -102,10 +102,7 @@ async def check_async(
     try:
         client = ecosystem.make_client(http)
         results = await asyncio.gather(
-            *(
-                _check_one(pkg, client, config, semaphore, fast=fast, now=now)
-                for pkg in packages
-            )
+            *(_check_one(pkg, client, config, semaphore, fast=fast, now=now) for pkg in packages)
         )
     finally:
         if own_http:
@@ -134,9 +131,7 @@ def check(
 
     Auto-detects the ecosystem from ``root`` unless ``ecosystem_kind`` is given.
     """
-    ecosystem = (
-        get_ecosystem(ecosystem_kind, root) if ecosystem_kind else detect_ecosystem(root)
-    )
+    ecosystem = get_ecosystem(ecosystem_kind, root) if ecosystem_kind else detect_ecosystem(root)
     return asyncio.run(
         check_async(
             ecosystem,

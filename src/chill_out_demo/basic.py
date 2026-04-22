@@ -8,7 +8,6 @@ display the captured output alongside the source.
 from __future__ import annotations
 
 import pendulum
-
 from chill_out import (
     BumpType,
     CooldownConfig,
@@ -72,9 +71,7 @@ def demo_04_find_safe_version() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(
-        days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5}
-    )
+    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
     safe = find_safe_version("2.0.0", info, config)
     if safe is None:
         print("no safe rollback target")

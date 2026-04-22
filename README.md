@@ -5,21 +5,54 @@
 
 # chill-out
 
-_Manage cooldown for package dependencies to avoid zero-day supply chain vulnerabilities_
+_Tell your dependencies to chill out and wait a few days before you trust them._
+
+A brand-new release of one of your dependencies is the riskiest thing in your
+lockfile. The maintainer's token might be stolen, a typosquatter might be
+sitting on the package name, or the release might just be broken. The fix is
+boring and effective: refuse to install any version that has been public for
+less than some grace period. That window is called a **cooldown**.
+
+`chill-out` reads the lockfile in your project, asks the registry when each
+installed version was published, and reports which packages are still inside
+their cooldown window. When it can, it suggests an older version that is
+safely out of cooldown so you can pin to it. It works for both **npm**
+projects (`package.json` + `package-lock.json`) and **Python** projects
+(`pyproject.toml` + `uv.lock`).
 
 
-## Super-quick Start
+## Super-quick start
 
-Requires: Python 3.12 to 3.14
-
-Install through pip:
+Requires: Python 3.12 to 3.14.
 
 ```bash
 pip install chill-out
 ```
 
+In any npm or Python project:
+
+```bash
+chill-out check
+```
+
+To rewrite your manifest with safe pins:
+
+```bash
+chill-out check --fix
+```
+
 
 ## Documentation
 
-The complete documentation can be found at the
-[chill-out home page](https://dusktreader.github.io/chill-out)
+The complete documentation lives at the
+[chill-out home page](https://dusktreader.github.io/chill-out).
+
+
+## Demo
+
+To poke at the features without installing anything globally, run the demo
+through `uv`:
+
+```bash
+uvx --from chill-out chill-out-demo
+```

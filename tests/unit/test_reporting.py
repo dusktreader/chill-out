@@ -5,12 +5,11 @@ from __future__ import annotations
 import io
 
 import pendulum
-from rich.console import Console
-
 from chill_out.config import CooldownConfig
 from chill_out.constants import BumpType, EcosystemKind
 from chill_out.models import CheckReport, InstalledPackage, SafeVersion, Violation
 from chill_out.reporting import render_report, render_thresholds
+from rich.console import Console
 
 
 def _capture(fn, *args, **kwargs) -> str:
@@ -22,9 +21,7 @@ def _capture(fn, *args, **kwargs) -> str:
 
 class TestRenderThresholds:
     def test_lists_all_bump_types(self) -> None:
-        cfg = CooldownConfig(
-            days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5}
-        )
+        cfg = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
         out = _capture(render_thresholds, cfg)
         for bump in ("major", "minor", "patch", "default"):
             assert bump in out
@@ -70,9 +67,7 @@ class TestRenderReport:
         assert "Suggested" not in out
 
     def test_via_column_appears_when_transitive(self) -> None:
-        pkg = InstalledPackage(
-            name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)
-        )
+        pkg = InstalledPackage(name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",))
         v = Violation(
             package=pkg,
             bump=BumpType.MAJOR,

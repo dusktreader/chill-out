@@ -50,14 +50,10 @@ def check(
         EcosystemKind | None,
         typer.Option("--ecosystem", "-e", help="Force a specific ecosystem; auto-detected otherwise."),
     ] = None,
-    deep: Annotated[
-        bool, typer.Option("--deep", help="Include transitive dependencies in the check.")
-    ] = False,
+    deep: Annotated[bool, typer.Option("--deep", help="Include transitive dependencies in the check.")] = False,
     fast: Annotated[
         bool,
-        typer.Option(
-            "--fast", help="Skip the safe-version lookup (faster, but no fix suggestions)."
-        ),
+        typer.Option("--fast", help="Skip the safe-version lookup (faster, but no fix suggestions)."),
     ] = False,
     fix: Annotated[
         bool,

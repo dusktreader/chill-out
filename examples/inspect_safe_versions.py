@@ -9,7 +9,6 @@ ask "is this version safe to use?" without spinning up `httpx` or subprocesses.
 from __future__ import annotations
 
 import pendulum
-
 from chill_out import (
     BumpType,
     CooldownConfig,
@@ -32,9 +31,7 @@ def main() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(
-        days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5}
-    )
+    config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 10, BumpType.PATCH: 7, BumpType.DEFAULT: 5})
 
     bump = release_type("2.0.0")
     violating, age, limit = is_within_cooldown(info.published_at("2.0.0"), bump, config)

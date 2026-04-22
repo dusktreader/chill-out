@@ -250,9 +250,7 @@ class NpmEcosystem(Ecosystem):
             return []
         log: list[str] = []
         root_pkg_path = self.root / "package.json"
-        EcosystemError.require_condition(
-            root_pkg_path.is_file(), f"No package.json at project root: {root_pkg_path}"
-        )
+        EcosystemError.require_condition(root_pkg_path.is_file(), f"No package.json at project root: {root_pkg_path}")
 
         root_pkg = json.loads(root_pkg_path.read_text())
         overrides = root_pkg.setdefault("overrides", {})
@@ -271,12 +269,8 @@ class NpmEcosystem(Ecosystem):
         root_pkg_path.write_text(json.dumps(root_pkg, indent=2) + "\n")
 
         # A single `npm install` will apply overrides + new deps in one go.
-        result = subprocess.run(
-            ["npm", "install"], cwd=self.root, capture_output=True, text=True
-        )
+        result = subprocess.run(["npm", "install"], cwd=self.root, capture_output=True, text=True)
         if result.returncode != 0:
-            raise EcosystemError(
-                f"`npm install` failed after applying fixes: {result.stderr.strip()}"
-            )
+            raise EcosystemError(f"`npm install` failed after applying fixes: {result.stderr.strip()}")
         log.append("ran: npm install")
         return log

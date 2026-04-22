@@ -43,34 +43,31 @@ def npm_project(tmp_path: Path) -> Path:
 def pypi_project(tmp_path: Path) -> Path:
     """A minimal Python project root with a pyproject.toml and uv.lock."""
     (tmp_path / "pyproject.toml").write_text(
-        '[project]\n'
-        'name = "fixture-app"\n'
-        'version = "0.1.0"\n'
-        'dependencies = ["requests==2.31.0", "click==8.1.7"]\n'
+        '[project]\nname = "fixture-app"\nversion = "0.1.0"\ndependencies = ["requests==2.31.0", "click==8.1.7"]\n'
     )
     (tmp_path / "uv.lock").write_text(
-        'version = 1\n'
-        '\n'
-        '[[package]]\n'
+        "version = 1\n"
+        "\n"
+        "[[package]]\n"
         'name = "requests"\n'
         'version = "2.31.0"\n'
-        '\n'
-        '[[package]]\n'
+        "\n"
+        "[[package]]\n"
         'name = "click"\n'
         'version = "8.1.7"\n'
-        '\n'
-        '[[package]]\n'
+        "\n"
+        "[[package]]\n"
         'name = "urllib3"\n'
         'version = "2.0.7"\n'
-        'dependencies = []\n'
-        '\n'
-        '[[package]]\n'
+        "dependencies = []\n"
+        "\n"
+        "[[package]]\n"
         'name = "fixture-app"\n'
         'version = "0.1.0"\n'
-        '[[package.dependencies]]\n'
+        "[[package.dependencies]]\n"
         'name = "requests"\n'
-        '\n'
-        '[[package.dependencies]]\n'
+        "\n"
+        "[[package.dependencies]]\n"
         'name = "click"\n'
     )
     return tmp_path

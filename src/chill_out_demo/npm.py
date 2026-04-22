@@ -16,7 +16,6 @@ from unittest.mock import patch
 import httpx
 import pendulum
 import respx
-
 from chill_out import NpmEcosystem, check_async, plan_fixes
 from chill_out.ecosystems.npm import NPM_REGISTRY
 

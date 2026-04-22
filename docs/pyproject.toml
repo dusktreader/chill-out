@@ -1,0 +1,21 @@
+[project]
+name = "chill-out-docs"
+version = "0.1.0"
+description = "Documentation site for chill-out"
+requires-python = ">=3.12"
+dependencies = [
+    "chill-out",
+]
+
+[dependency-groups]
+dev = [
+    "mkdocstrings[python]>=0.27",
+    "pygments~=2.19",
+    "zensical~=0.0.33",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+chill-out = { path = "..", editable = true }

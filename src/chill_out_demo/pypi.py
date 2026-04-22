@@ -16,7 +16,6 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
-
 from chill_out import PypiEcosystem, check_async, plan_fixes
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.pypi import PYPI_REGISTRY
@@ -28,13 +27,10 @@ def _iso(days_ago: int) -> str:
 
 def _make_pypi_project(tmp: Path) -> None:
     (tmp / "pyproject.toml").write_text(
-        '[project]\n'
-        'name = "demo-app"\n'
-        'version = "0.1.0"\n'
-        'dependencies = ["fresh-pkg==2.0.0", "settled-pkg==1.0.0"]\n'
+        '[project]\nname = "demo-app"\nversion = "0.1.0"\ndependencies = ["fresh-pkg==2.0.0", "settled-pkg==1.0.0"]\n'
     )
     (tmp / "uv.lock").write_text(
-        'version = 1\n'
+        "version = 1\n"
         '[[package]]\nname = "fresh-pkg"\nversion = "2.0.0"\n\n'
         '[[package]]\nname = "settled-pkg"\nversion = "1.0.0"\n'
     )
@@ -53,9 +49,7 @@ def _seed_registry() -> None:
         )
     )
     respx.get(f"{PYPI_REGISTRY}/settled-pkg/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}})
     )
 
 

@@ -9,10 +9,8 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
-
 from chill_out.ecosystems.npm import NPM_REGISTRY, NpmEcosystem, NpmRegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
-
 
 # ---------------------------------------------------------------------------
 # NpmRegistryClient
@@ -69,11 +67,9 @@ class TestNpmRegistryClient:
             await client.fetch_package("x")
 
     @respx.mock
-    async def test_fetch_ignores_unparseable_dates(self, http_client: httpx.AsyncClient) -> None:
+    async def test_fetch_ignores_unparsable_dates(self, http_client: httpx.AsyncClient) -> None:
         respx.get(f"{NPM_REGISTRY}/x").mock(
-            return_value=httpx.Response(
-                200, json={"time": {"1.0.0": "garbage", "2.0.0": "2024-01-01T00:00:00.000Z"}}
-            )
+            return_value=httpx.Response(200, json={"time": {"1.0.0": "garbage", "2.0.0": "2024-01-01T00:00:00.000Z"}})
         )
         client = NpmRegistryClient(http_client)
         info = await client.fetch_package("x")
@@ -145,26 +141,20 @@ class TestNpmEcosystemNpmList:
     def test_accepts_exit_code_1(self, tmp_path: Path) -> None:
         _write_pkg_json(tmp_path / "package.json", {"name": "x"})
         eco = NpmEcosystem(tmp_path)
-        fake_result = type(
-            "R", (), {"returncode": 1, "stdout": '{"dependencies": {}}', "stderr": ""}
-        )()
+        fake_result = type("R", (), {"returncode": 1, "stdout": '{"dependencies": {}}', "stderr": ""})()
         with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_result):
             assert eco._npm_list(depth=1) == {"dependencies": {}}
 
 
 class TestNpmEcosystemApplyFixes:
     def test_writes_overrides_and_runs_install(self, tmp_path: Path) -> None:
-        _write_pkg_json(
-            tmp_path / "package.json", {"name": "app", "dependencies": {"left-pad": "^1.0.0"}}
-        )
+        _write_pkg_json(tmp_path / "package.json", {"name": "app", "dependencies": {"left-pad": "^1.0.0"}})
         eco = NpmEcosystem(tmp_path)
         from chill_out.models import FixAction
 
         fake_install = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
-            log = eco.apply_fixes(
-                [FixAction(package="left-pad", version="1.2.0", is_override=True)]
-            )
+            log = eco.apply_fixes([FixAction(package="left-pad", version="1.2.0", is_override=True)])
         new_pkg = json.loads((tmp_path / "package.json").read_text())
         assert new_pkg["overrides"] == {"left-pad": "1.2.0"}
         assert any("override" in line for line in log)
@@ -175,9 +165,7 @@ class TestNpmEcosystemApplyFixes:
         eco = NpmEcosystem(tmp_path)
         from chill_out.models import FixAction
 
-        fake_install = type(
-            "R", (), {"returncode": 1, "stdout": "", "stderr": "ENOSOLO"}
-        )()
+        fake_install = type("R", (), {"returncode": 1, "stdout": "", "stderr": "ENOSOLO"})()
         with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake_install):
             with pytest.raises(EcosystemError, match="ENOSOLO"):
                 eco.apply_fixes([FixAction(package="x", version="1.0.0")])
@@ -227,7 +215,7 @@ class TestNpmEcosystemLoadDeep:
         assert by_name["leaf"].via == "principal"
         assert by_name["leaf"].via_chain == ("middle", "principal")
 
-    def test_unparseable_lock_yields_empty_graph(self, tmp_path: Path) -> None:
+    def test_unparsable_lock_yields_empty_graph(self, tmp_path: Path) -> None:
         _write_pkg_json(tmp_path / "package.json", {"name": "app", "dependencies": {"x": "^1"}})
         (tmp_path / "package-lock.json").write_text("not json")
         eco = NpmEcosystem(tmp_path)
@@ -239,7 +227,7 @@ class TestNpmEcosystemLoadDeep:
             pkgs = eco.load_installed(deep=True)
         assert {p.name for p in pkgs} == {"x"}
 
-    def test_unparseable_package_json_is_skipped(self, tmp_path: Path) -> None:
+    def test_unparsable_package_json_is_skipped(self, tmp_path: Path) -> None:
         (tmp_path / "package.json").write_text("garbage")
         # Add a valid sub-package.json so we don't hit the "no deps declared" code path entirely.
         sub = tmp_path / "sub"

@@ -6,12 +6,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pendulum
-from typer.testing import CliRunner
-
 from chill_out import __version__
 from chill_out.cli.main import cli
 from chill_out.constants import EcosystemKind
 from chill_out.models import CheckReport, InstalledPackage, SafeVersion, Violation
+from typer.testing import CliRunner
 
 
 def _patch_check_returning(report: CheckReport):
@@ -67,9 +66,7 @@ class TestCheck:
         assert result.exit_code == 2  # ExitCode.COOLDOWN_VIOLATION
 
     def test_fix_with_fast_is_rejected(self, pypi_project: Path) -> None:
-        result = CliRunner().invoke(
-            cli, ["check", "--root", str(pypi_project), "--fix", "--fast"]
-        )
+        result = CliRunner().invoke(cli, ["check", "--root", str(pypi_project), "--fix", "--fast"])
         assert result.exit_code != 0
         assert "fast" in result.stdout.lower() or "fast" in (result.stderr or "").lower()
 
@@ -93,10 +90,13 @@ class TestCheck:
             safe_version=SafeVersion(version="1.5.0", age_days=200),
         )
         report = CheckReport(ecosystem=EcosystemKind.PYPI, checked=[pkg], violations=[v])
-        with _patch_check_returning(report), patch(
-            "chill_out.ecosystems.pypi.PypiEcosystem.apply_fixes",
-            return_value=["pinned x -> 1.5.0", "ran: uv lock"],
-        ) as apply_mock:
+        with (
+            _patch_check_returning(report),
+            patch(
+                "chill_out.ecosystems.pypi.PypiEcosystem.apply_fixes",
+                return_value=["pinned x -> 1.5.0", "ran: uv lock"],
+            ) as apply_mock,
+        ):
             result = CliRunner().invoke(cli, ["check", "--root", str(pypi_project), "--fix"])
         assert apply_mock.called
         # Still exits 2 because violations existed during the check.

@@ -14,13 +14,11 @@ import httpx
 import pendulum
 import pytest
 import respx
-from typer.testing import CliRunner
-
 from chill_out.cli.main import cli
 from chill_out.constants import ExitCode
 from chill_out.ecosystems.npm import NPM_REGISTRY
 from chill_out.ecosystems.pypi import PYPI_REGISTRY
-
+from typer.testing import CliRunner
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -48,18 +46,15 @@ def runner() -> CliRunner:
 @pytest.fixture
 def pypi_root(tmp_path: Path) -> Path:
     (tmp_path / "pyproject.toml").write_text(
-        '[project]\n'
-        'name = "fixture"\n'
-        'version = "0.1.0"\n'
-        'dependencies = ["fastdep==2.0.0", "olddep==1.0.0"]\n'
+        '[project]\nname = "fixture"\nversion = "0.1.0"\ndependencies = ["fastdep==2.0.0", "olddep==1.0.0"]\n'
     )
     (tmp_path / "uv.lock").write_text(
-        'version = 1\n'
-        '[[package]]\n'
+        "version = 1\n"
+        "[[package]]\n"
         'name = "fastdep"\n'
         'version = "2.0.0"\n'
-        '\n'
-        '[[package]]\n'
+        "\n"
+        "[[package]]\n"
         'name = "olddep"\n'
         'version = "1.0.0"\n'
     )
@@ -67,9 +62,7 @@ def pypi_root(tmp_path: Path) -> Path:
 
 
 @respx.mock
-def test_pypi_check_reports_violations_and_exits_nonzero(
-    pypi_root: Path, runner: CliRunner
-) -> None:
+def test_pypi_check_reports_violations_and_exits_nonzero(pypi_root: Path, runner: CliRunner) -> None:
     """A package published yesterday should violate cooldown; an old package should pass."""
     respx.get(f"{PYPI_REGISTRY}/fastdep/json").mock(
         return_value=httpx.Response(
@@ -99,14 +92,10 @@ def test_pypi_check_reports_violations_and_exits_nonzero(
 @respx.mock
 def test_pypi_check_succeeds_when_all_deps_are_old(pypi_root: Path, runner: CliRunner) -> None:
     respx.get(f"{PYPI_REGISTRY}/fastdep/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"2.0.0": [{"upload_time_iso_8601": _iso(400)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"2.0.0": [{"upload_time_iso_8601": _iso(400)}]}})
     )
     respx.get(f"{PYPI_REGISTRY}/olddep/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}})
     )
     result = runner.invoke(cli, ["check", "--root", str(pypi_root), "--quiet"])
     assert result.exit_code == 0
@@ -114,9 +103,7 @@ def test_pypi_check_succeeds_when_all_deps_are_old(pypi_root: Path, runner: CliR
 
 
 @respx.mock
-def test_pypi_fix_pins_violating_dep_and_calls_uv_lock(
-    pypi_root: Path, runner: CliRunner
-) -> None:
+def test_pypi_fix_pins_violating_dep_and_calls_uv_lock(pypi_root: Path, runner: CliRunner) -> None:
     respx.get(f"{PYPI_REGISTRY}/fastdep/json").mock(
         return_value=httpx.Response(
             200,
@@ -129,9 +116,7 @@ def test_pypi_fix_pins_violating_dep_and_calls_uv_lock(
         )
     )
     respx.get(f"{PYPI_REGISTRY}/olddep/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}})
     )
 
     fake_uv = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
@@ -148,14 +133,10 @@ def test_pypi_fix_pins_violating_dep_and_calls_uv_lock(
 @respx.mock
 def test_pypi_fast_mode_omits_safe_version(pypi_root: Path, runner: CliRunner) -> None:
     respx.get(f"{PYPI_REGISTRY}/fastdep/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"2.0.0": [{"upload_time_iso_8601": _iso(1)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"2.0.0": [{"upload_time_iso_8601": _iso(1)}]}})
     )
     respx.get(f"{PYPI_REGISTRY}/olddep/json").mock(
-        return_value=httpx.Response(
-            200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}}
-        )
+        return_value=httpx.Response(200, json={"releases": {"1.0.0": [{"upload_time_iso_8601": _iso(400)}]}})
     )
     result = runner.invoke(cli, ["check", "--root", str(pypi_root), "--quiet", "--fast"])
     assert result.exit_code == int(ExitCode.COOLDOWN_VIOLATION)
@@ -215,9 +196,7 @@ def test_npm_check_reports_violation(npm_root: Path, runner: CliRunner) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_check_fails_clearly_with_no_recognised_ecosystem(
-    tmp_path: Path, runner: CliRunner
-) -> None:
+def test_check_fails_clearly_with_no_recognised_ecosystem(tmp_path: Path, runner: CliRunner) -> None:
     result = runner.invoke(cli, ["check", "--root", str(tmp_path), "--quiet"])
     assert result.exit_code != 0
     # The error reaches stdout via the rich console (typer captures both streams).

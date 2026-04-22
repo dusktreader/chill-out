@@ -15,7 +15,6 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
-
 from chill_out import BumpType, CooldownConfig, PypiEcosystem, check_async
 from chill_out.ecosystems.pypi import PYPI_REGISTRY
 
@@ -46,10 +45,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as raw_tmp:
         root = Path(raw_tmp)
         (root / "pyproject.toml").write_text(
-            '[project]\n'
-            'name = "demo"\n'
-            'version = "0.1.0"\n'
-            'dependencies = ["example-pkg==1.0.0"]\n'
+            '[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = ["example-pkg==1.0.0"]\n'
         )
         report = asyncio.run(check_async(PypiEcosystem(root), config=config))
 

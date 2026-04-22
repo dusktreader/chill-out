@@ -7,7 +7,7 @@ All exception types derived from `ChillOutError` will, by default, be handled by
 
 import functools
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import typer
 from buzz import Buzz
@@ -98,6 +98,6 @@ def handle_errors(message: str) -> Callable[[F], F]:
                 )
                 raise typer.Exit(code=int(ExitCode.INTERNAL_ERROR)) from err
 
-        return wrapper  # type: ignore[return-value]
+        return cast(F, wrapper)
 
     return decorator

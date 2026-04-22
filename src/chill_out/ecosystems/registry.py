@@ -21,8 +21,9 @@ _REGISTRY: dict[EcosystemKind, type[Ecosystem]] = {
 def get_ecosystem(kind: EcosystemKind, root: Path) -> Ecosystem:
     """Instantiate a backend by kind for the given project root."""
     cls = _REGISTRY.get(kind)
-    EcosystemError.require_condition(cls is not None, f"Unknown ecosystem: {kind}")
-    return cls(root)  # type: ignore[misc]
+    if cls is None:
+        raise EcosystemError(f"Unknown ecosystem: {kind}")
+    return cls(root)
 
 
 def detect_ecosystem(root: Path) -> Ecosystem:
@@ -36,8 +37,7 @@ def detect_ecosystem(root: Path) -> Ecosystem:
     matches = [cls for cls in _REGISTRY.values() if cls.detect(root)]
     EcosystemError.require_condition(
         len(matches) > 0,
-        f"Could not detect a supported ecosystem in {root}. "
-        f"Looked for npm (package.json) and pypi (pyproject.toml).",
+        f"Could not detect a supported ecosystem in {root}. Looked for npm (package.json) and pypi (pyproject.toml).",
     )
     EcosystemError.require_condition(
         len(matches) == 1,

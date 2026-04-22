@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems import NpmEcosystem, PypiEcosystem, detect_ecosystem, get_ecosystem
 from chill_out.exceptions import EcosystemError

@@ -115,7 +115,7 @@ class PypiEcosystem(Ecosystem):
                 try:
                     req = Requirement(str(raw))
                 except InvalidRequirement:
-                    logger.warning(f"Skipping unparseable requirement: {raw!r}")
+                    logger.warning(f"Skipping unparsable requirement: {raw!r}")
                     continue
                 specs[_normalize(req.name)] = str(raw)
 
@@ -267,9 +267,7 @@ class PypiEcosystem(Ecosystem):
 
         path.write_text(tomlkit.dumps(doc))
 
-        result = subprocess.run(
-            ["uv", "lock"], cwd=self.root, capture_output=True, text=True
-        )
+        result = subprocess.run(["uv", "lock"], cwd=self.root, capture_output=True, text=True)
         if result.returncode != 0:
             raise EcosystemError(f"`uv lock` failed after applying fixes: {result.stderr.strip()}")
         log.append("ran: uv lock")

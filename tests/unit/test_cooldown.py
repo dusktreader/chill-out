@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pendulum
-
 from chill_out.config import CooldownConfig
 from chill_out.constants import BumpType
 from chill_out.cooldown import find_safe_version, is_within_cooldown, parse_version, release_type
@@ -60,9 +59,7 @@ class TestFindSafeVersion:
     def _info(self, releases: dict[str, pendulum.DateTime]) -> PackageInfo:
         return PackageInfo(
             name="acme",
-            releases={
-                v: PackageRelease(version=v, published=ts) for v, ts in releases.items()
-            },
+            releases={v: PackageRelease(version=v, published=ts) for v, ts in releases.items()},
         )
 
     def test_returns_newest_safe_older_version(self, fixed_now: pendulum.DateTime) -> None:
@@ -97,18 +94,16 @@ class TestFindSafeVersion:
                 "1.0.0": fixed_now.subtract(days=200),
             }
         )
-        config = CooldownConfig(
-            days={BumpType.MAJOR: 30, BumpType.MINOR: 30, BumpType.PATCH: 30, BumpType.DEFAULT: 5}
-        )
+        config = CooldownConfig(days={BumpType.MAJOR: 30, BumpType.MINOR: 30, BumpType.PATCH: 30, BumpType.DEFAULT: 5})
         safe = find_safe_version("2.0.0", info, config, now=fixed_now)
         assert safe is not None
         assert safe.version == "1.0.0"
 
-    def test_returns_none_for_unparseable_current(self, fixed_now: pendulum.DateTime) -> None:
+    def test_returns_none_for_unparsable_current(self, fixed_now: pendulum.DateTime) -> None:
         info = self._info({"1.0.0": fixed_now.subtract(days=200)})
         assert find_safe_version("not-a-version", info, CooldownConfig(), now=fixed_now) is None
 
-    def test_ignores_unparseable_releases(self, fixed_now: pendulum.DateTime) -> None:
+    def test_ignores_unparsable_releases(self, fixed_now: pendulum.DateTime) -> None:
         info = self._info(
             {
                 "2.0.0": fixed_now.subtract(days=1),

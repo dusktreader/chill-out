@@ -36,10 +36,10 @@ qa/format:  ## Run code formatter
 docs: docs/serve  ## Shortcut for docs/serve
 
 docs/build:  ## Build the documentation
-	@uv run mkdocs build --config-file=docs/mkdocs.yaml
+	@uv run --project docs zensical build --config-file=docs/mkdocs.yaml
 
 docs/serve:  ## Build the docs and start a local dev server
-	@uv run mkdocs serve --config-file=docs/mkdocs.yaml --dev-addr=localhost:10000
+	@uv run --project docs zensical serve --config-file=docs/mkdocs.yaml --dev-addr=localhost:10000
 
 ## ==== Application ====================================================================================================
 
@@ -58,10 +58,10 @@ app/debug:  ## Run the CLI application in debug mode
 demo: demo/run  ## Shortcut for demo/run
 
 demo/run:  ## Run the demo application
-	@uv run chill_out-demo
+	@uv run chill-out-demo
 
 demo/debug:  ## Run the demo application in debug mode
-	@uv run debugpy --listen localhost:5678 --wait-for-client chill_out-demo
+	@uv run debugpy --listen localhost:5678 --wait-for-client -m chill_out_demo.main
 
 
 

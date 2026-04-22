@@ -8,7 +8,6 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
-
 from chill_out.constants import EcosystemKind
 from chill_out.ecosystems.pypi import PYPI_REGISTRY, PypiEcosystem, PypiRegistryClient, _normalize
 from chill_out.exceptions import EcosystemError, RegistryError
@@ -28,9 +27,7 @@ async def http_client():
 
 class TestPypiRegistryClient:
     @respx.mock
-    async def test_fetch_returns_earliest_upload_per_version(
-        self, http_client: httpx.AsyncClient
-    ) -> None:
+    async def test_fetch_returns_earliest_upload_per_version(self, http_client: httpx.AsyncClient) -> None:
         respx.get(f"{PYPI_REGISTRY}/requests/json").mock(
             return_value=httpx.Response(
                 200,
@@ -40,9 +37,7 @@ class TestPypiRegistryClient:
                             {"upload_time_iso_8601": "2023-05-22T15:12:00.000Z"},
                             {"upload_time_iso_8601": "2023-05-22T15:00:00.000Z"},
                         ],
-                        "2.30.0": [
-                            {"upload_time_iso_8601": "2023-04-01T00:00:00.000Z"}
-                        ],
+                        "2.30.0": [{"upload_time_iso_8601": "2023-04-01T00:00:00.000Z"}],
                         "empty": [],
                     }
                 },
@@ -52,8 +47,9 @@ class TestPypiRegistryClient:
         info = await client.fetch_package("requests")
         assert info is not None
         assert "empty" not in info.releases
-        assert info.published_at("2.31.0") is not None
-        assert info.published_at("2.31.0").to_iso8601_string().startswith("2023-05-22T15:00:00")
+        published = info.published_at("2.31.0")
+        assert published is not None
+        assert published.to_iso8601_string().startswith("2023-05-22T15:00:00")
 
     @respx.mock
     async def test_404_returns_none(self, http_client: httpx.AsyncClient) -> None:
@@ -98,8 +94,7 @@ class TestPypiEcosystemLoadDirect:
 
     def test_falls_back_to_pinned_spec_when_no_lock(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname="x"\nversion="0"\n'
-            'dependencies = ["only-pinned==1.2.3", "no-pin>=1"]\n'
+            '[project]\nname="x"\nversion="0"\ndependencies = ["only-pinned==1.2.3", "no-pin>=1"]\n'
         )
         eco = PypiEcosystem(tmp_path)
         pkgs = eco.load_installed(deep=False)
@@ -110,9 +105,9 @@ class TestPypiEcosystemLoadDirect:
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname="x"\nversion="0"\n'
             'dependencies = ["a==1"]\n'
-            '[project.optional-dependencies]\n'
+            "[project.optional-dependencies]\n"
             'extra = ["b==2"]\n'
-            '[dependency-groups]\n'
+            "[dependency-groups]\n"
             'dev = ["c==3"]\n'
         )
         eco = PypiEcosystem(tmp_path)
@@ -138,9 +133,7 @@ class TestPypiEcosystemLoadDeep:
 
 class TestPypiEcosystemApplyFixes:
     def test_pins_existing_dependency(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname="x"\nversion="0"\ndependencies = ["requests>=2.0"]\n'
-        )
+        (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\ndependencies = ["requests>=2.0"]\n')
         eco = PypiEcosystem(tmp_path)
         fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):
@@ -151,9 +144,7 @@ class TestPypiEcosystemApplyFixes:
         assert "ran: uv lock" in log
 
     def test_adds_when_missing(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname="x"\nversion="0"\ndependencies = []\n'
-        )
+        (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\ndependencies = []\n')
         eco = PypiEcosystem(tmp_path)
         fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):
@@ -163,9 +154,7 @@ class TestPypiEcosystemApplyFixes:
         assert any("added newpkg" in line for line in log)
 
     def test_uv_lock_failure_raises(self, tmp_path: Path) -> None:
-        (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname="x"\nversion="0"\ndependencies = ["a==1"]\n'
-        )
+        (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\ndependencies = ["a==1"]\n')
         eco = PypiEcosystem(tmp_path)
         fake = type("R", (), {"returncode": 1, "stdout": "", "stderr": "lock failed"})()
         with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):

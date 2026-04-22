@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from chill_out.config import CooldownConfig, load_config
 from chill_out.constants import DEFAULT_COOLDOWN_DAYS, BumpType, EcosystemKind
 from chill_out.exceptions import ConfigError
@@ -73,22 +72,17 @@ class TestLayering:
         gh = tmp_path / ".github"
         gh.mkdir()
         (gh / "dependabot.yml").write_text(
-            "updates:\n"
-            "  - package-ecosystem: npm\n"
-            "    cooldown:\n"
-            "      semver-major-days: 99\n"
+            "updates:\n  - package-ecosystem: npm\n    cooldown:\n      semver-major-days: 99\n"
         )
         (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname = "x"\nversion = "0"\n'
-            '[tool.chill-out.cooldown]\nmajor = 7\n'
+            '[project]\nname = "x"\nversion = "0"\n[tool.chill-out.cooldown]\nmajor = 7\n'
         )
         cfg = load_config(tmp_path, EcosystemKind.NPM)
         assert cfg.for_bump(BumpType.MAJOR) == 7
 
     def test_yaml_overrides_pyproject(self, tmp_path: Path) -> None:
         (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname = "x"\nversion = "0"\n'
-            '[tool.chill-out.cooldown]\nmajor = 7\n'
+            '[project]\nname = "x"\nversion = "0"\n[tool.chill-out.cooldown]\nmajor = 7\n'
         )
         (tmp_path / ".chill-out.yaml").write_text("cooldown:\n  major: 3\n")
         cfg = load_config(tmp_path, EcosystemKind.NPM)
