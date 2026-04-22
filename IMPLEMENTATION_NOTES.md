@@ -157,6 +157,29 @@ against the local `package.json`'s declared names. Deeper nesting (workspaces
 inside workspaces) is treated as transitive territory and stays out of direct
 mode. The workspace member's own entry is never reported as a package.
 
+### npm deep-mode workspace scoping and shallowest-wins
+
+Deep mode has the same workspace-from-member problem, plus a subtler one. When
+`npm list --all --json` runs from a workspace member it walks up to the
+workspace root and reports every member's tree, so a naive walk would surface
+sibling members' transitives and try to fix them through the wrong
+`package.json`.
+
+The deep loader now reads the running project's own `package.json` to learn its
+declared name, then locates that name as a top-level dependency in the
+npm-list output and uses just that subtree as the collection root. When
+`self.root` already equals the workspace root the scoping is skipped.
+
+The second issue is duplicate version reconciliation. Within a single subtree
+the same package can appear at multiple depths with different versions —
+typically a top-level pin alongside one or more deeper transitive copies that
+npm couldn't dedupe. The version actually loaded at runtime is the one npm
+hoisted to `node_modules/<pkg>`, which is the shallowest copy. The collector
+runs a two-pass walk per node — register every direct child, then recurse —
+so the shallowest version always lands in the dedupe map first. Without this
+pass-ordering, a depth-first walk would let a deep transitive shadow the
+hoisted top-level pin and re-flag a violation that the user already fixed.
+
 ### Registry caching
 
 `CachingRegistryClient` wraps any `RegistryClient` with a per-process,

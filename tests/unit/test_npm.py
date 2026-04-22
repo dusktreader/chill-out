@@ -315,6 +315,64 @@ class TestNpmEcosystemLoadDeep:
             pkgs = eco.load_installed(deep=False)
         assert pkgs == []
 
+    def test_top_level_version_wins_over_nested_duplicate(self, tmp_path: Path) -> None:
+        """A direct pin must shadow a deeper transitive copy of the same package."""
+        _write_pkg_json(
+            tmp_path / "package.json",
+            {"name": "app", "dependencies": {"big": "^1", "leaf": "1.0.0"}},
+        )
+        (tmp_path / "package-lock.json").write_text(json.dumps({"packages": {}}))
+        # `big` lists an iteration order before `leaf`, and its nested `leaf` is
+        # at the unsafe version; the top-level pin sits at the safe version.
+        npm_list = {
+            "dependencies": {
+                "big": {
+                    "version": "1.0.0",
+                    "dependencies": {"leaf": {"version": "2.0.0"}},
+                },
+                "leaf": {"version": "1.0.0"},
+            }
+        }
+        eco = NpmEcosystem(tmp_path)
+        with patch.object(NpmEcosystem, "_npm_list", return_value=npm_list):
+            pkgs = eco.load_installed(deep=True)
+        by_name = {p.name: p for p in pkgs}
+        assert by_name["leaf"].version == "1.0.0", (
+            "shallowest version should win because npm hoists it to node_modules/<pkg>"
+        )
+
+    def test_scopes_to_workspace_member_subtree(self, tmp_path: Path) -> None:
+        """When run from a workspace member, only that member's subtree is loaded."""
+        ws = tmp_path / "ws"
+        member = ws / "api"
+        member.mkdir(parents=True)
+        _write_pkg_json(ws / "package.json", {"name": "ws", "workspaces": ["api", "web"]})
+        _write_pkg_json(member / "package.json", {"name": "@org/api", "dependencies": {"a": "^1"}})
+        (ws / "package-lock.json").write_text(json.dumps({"packages": {}}))
+        # npm list from inside `api` walks up to the workspace root and reports
+        # both members; we should only collect what's under the @org/api subtree.
+        npm_list = {
+            "dependencies": {
+                "@org/api": {
+                    "version": "1.0.0",
+                    "resolved": "file:../../api",
+                    "dependencies": {"a": {"version": "1.0.0"}},
+                },
+                "@org/web": {
+                    "version": "1.0.0",
+                    "resolved": "file:../../web",
+                    "dependencies": {"sibling-only": {"version": "1.0.0"}},
+                },
+            }
+        }
+        eco = NpmEcosystem(member)
+        with patch.object(NpmEcosystem, "_npm_list", return_value=npm_list):
+            pkgs = eco.load_installed(deep=True)
+        names = {p.name for p in pkgs}
+        assert "a" in names
+        assert "sibling-only" not in names, "sibling member's deps should be excluded"
+        assert "@org/web" not in names
+
 
 class TestNpmFindLockfile:
     """Lockfile lookup walks up to a workspace root when needed."""

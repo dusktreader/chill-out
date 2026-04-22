@@ -167,6 +167,14 @@ class NpmEcosystem(Ecosystem):
         dep_names = self._read_root_package_json()
         data = self._npm_list(depth=None)
 
+        # If we're inside a workspace member, npm list walks up to the
+        # workspace root and reports every member's tree. Scope down to just
+        # this member's subtree so we don't surface (and try to fix) packages
+        # that belong to a sibling member.
+        member_node = self._find_workspace_member(data)
+        if member_node is not None:
+            data = member_node
+
         # Build a reverse-dep graph from package-lock.json so we can attribute
         # each transitive dep to a principal.
         required_by = self._build_required_by()
@@ -195,7 +203,13 @@ class NpmEcosystem(Ecosystem):
         packages: dict[str, InstalledPackage] = {}
 
         def collect(node: dict[str, Any]) -> None:
-            for name, info in (node.get("dependencies") or {}).items():
+            # Two-pass per node: register every direct child first, then
+            # recurse. Top-level wins over deeply nested copies — important
+            # because npm hoists the shallowest version to ``node_modules/<pkg>``
+            # and that's the one that actually gets loaded at runtime. A naive
+            # depth-first walk would let a transitive duplicate shadow it.
+            children = (node.get("dependencies") or {}).items()
+            for name, info in children:
                 version = info.get("version")
                 if not version:
                     continue
@@ -207,11 +221,47 @@ class NpmEcosystem(Ecosystem):
                         ecosystem=self.kind,
                         via_chain=via_chain,
                     )
+            for _, info in children:
                 collect(info)
 
         collect(data)
 
         return list(packages.values())
+
+    def _find_workspace_member(self, data: dict[str, Any]) -> dict[str, Any] | None:
+        """
+        Locate the workspace-member subtree in ``npm list`` output that matches ``self.root``.
+
+        When ``npm list`` runs inside a workspace member it walks up to the
+        workspace root and reports the whole workspace tree. Each member shows
+        up as a top-level entry keyed by its declared package name. Read the
+        member's own ``package.json`` for that name and return the matching
+        subtree.
+
+        Returns ``None`` when ``self.root`` is itself the workspace root, when
+        the member's ``package.json`` is unreadable or unnamed, or when no
+        matching entry is present in the workspace tree.
+        """
+        lock_path = self._find_lockfile()
+        if lock_path is None:
+            return None
+        workspace_root = lock_path.parent
+        if workspace_root.resolve() == self.root.resolve():
+            return None
+        member_pkg_path = self.root / "package.json"
+        if not member_pkg_path.is_file():
+            return None
+        try:
+            member_doc = json.loads(member_pkg_path.read_text())
+        except json.JSONDecodeError:
+            return None
+        member_name = member_doc.get("name")
+        if not member_name:
+            return None
+        node = (data.get("dependencies") or {}).get(member_name)
+        if node is None:
+            return None
+        return node
 
     def _find_lockfile(self) -> Path | None:
         """
