@@ -1,5 +1,9 @@
 .junit.xml
 
+# npm artifacts (generated under examples/)
+node_modules/
+package-lock.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,0 +1,12 @@
+{
+  "name": "@shop/web",
+  "version": "0.1.0",
+  "description": "Web frontend. Depends on the api package, so it transitively inherits the same @smithy/util-endpoints pin.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "dependencies": {
+    "@shop/api": "*",
+    "react": "^18.0.0"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@shop/worker",
+  "version": "0.1.0",
+  "description": "Background worker. Pulls in a newer AWS SDK whose own transitive @smithy/util-endpoints requirement conflicts with the api's pin.",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/credential-providers": "^3.900.0"
+  }
+}

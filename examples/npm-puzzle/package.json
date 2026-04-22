@@ -1,38 +1,12 @@
 {
-  "name": "assess-item-analyzer",
-  "version": "0.19.0",
-  "description": "Item Analyzer monorepo (API + backend daemon)",
+  "name": "shop-monorepo",
+  "version": "0.1.0",
+  "description": "Anonymized npm workspace puzzle for chill-out: a shared transitive (@smithy/util-endpoints) is held back by api's direct pin, but worker pulls in a newer AWS SDK that wants the modern version. The conflict can only be resolved by an override at the workspace root.",
   "private": true,
   "type": "module",
   "workspaces": [
     "api",
-    "backend",
-    "ui"
-  ],
-  "scripts": {
-    "test": "npm run test --workspaces",
-    "test:api": "npm run test --workspace=api",
-    "test:backend": "npm run test --workspace=backend",
-    "typecheck": "npm run typecheck --workspaces",
-    "lint": "npm run lint --workspaces",
-    "lint:fix": "npm run lint:fix --workspaces",
-    "lint:md": "markdownlint-cli2 '**/*.md' '#**/node_modules' '#docs/.venv' '#infra/helm/item-analyzer/charts/**'",
-    "lint:md:fix": "markdownlint-cli2 --fix '**/*.md' '#**/node_modules' '#docs/.venv' '#infra/helm/item-analyzer/charts/**'",
-    "build": "npm run build --workspaces",
-    "prepare": "node -e \"if (process.env.CI || process.env.HUSKY === '0') process.exit(0)\" && husky || true"
-  },
-  "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "husky": "^9.1.7",
-    "markdownlint-cli2": "^0.21.0",
-    "minimatch": "^3.1.5"
-  },
-  "engines": {
-    "node": ">=24.0.0"
-  },
-  "overrides": {
-    "@smithy/util-endpoints": "3.3.4"
-  }
+    "worker",
+    "web"
+  ]
 }

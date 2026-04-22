@@ -686,3 +686,30 @@ class TestNpmSupportsOverrides:
         (tmp_path / "package.json").write_text("{}")
         eco = NpmEcosystem(tmp_path)
         assert eco.supports_overrides() is True
+
+
+class TestNpmListAtWorkspaceRoot:
+    def test_returns_none_when_self_root_is_workspace_root(self, tmp_path: Path) -> None:
+        # Lockfile lives in self.root; no extra call needed
+        (tmp_path / "package.json").write_text("{}")
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco._npm_list_at_workspace_root() is None
+
+    def test_returns_none_when_no_lockfile_anywhere(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco._npm_list_at_workspace_root() is None
+
+    def test_runs_npm_at_workspace_root_when_self_is_member(self, tmp_path: Path) -> None:
+        # Set up a workspace where self.root is a member
+        _make_workspace(tmp_path, {"api": []})
+        eco = NpmEcosystem(tmp_path / "packages" / "api")
+        with patch("chill_out.ecosystems.npm.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = '{"dependencies": {}}'
+            run.return_value.stderr = ""
+            result = eco._npm_list_at_workspace_root()
+        assert result == {"dependencies": {}}
+        # cwd should be the workspace root, not the member
+        assert run.call_args.kwargs["cwd"] == tmp_path

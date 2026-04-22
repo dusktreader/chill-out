@@ -174,14 +174,16 @@ class NpmEcosystem(Ecosystem):
     def _load_all(self) -> list[InstalledPackage]:
         data = self._npm_list(depth=None)
 
-        # Compute cross-member ownership before scoping. When npm list is
-        # rooted at a workspace, each top-level entry is a workspace member
-        # and its subtree contains everything that member pulls in. Build a
-        # (name, version) -> set[member_name] index so we can tag each
-        # installation with the members that share it. In a non-workspace
-        # context this index is empty and member_owners stays the empty
-        # tuple.
-        ownership = self._compute_member_ownership(data)
+        # Compute cross-member ownership by running npm list at the workspace
+        # root. When self.root is a workspace member, npm scopes its own
+        # output to that member's subtree, which would misattribute every
+        # install to a single owner. Walking the lockfile-rooted tree gives
+        # us the full picture: each top-level file:-resolved entry is a
+        # workspace member and its subtree shows everything that member
+        # pulls in. In a non-workspace context this falls back to the
+        # already-loaded data and the index ends up empty.
+        ownership_data = self._npm_list_at_workspace_root() or data
+        ownership = self._compute_member_ownership(ownership_data)
 
         # If we're inside a workspace member, npm list walks up to the
         # workspace root and reports every member's tree. Scope down to just
@@ -396,6 +398,29 @@ class NpmEcosystem(Ecosystem):
             return json.loads(result.stdout)
         except json.JSONDecodeError as exc:
             raise EcosystemError(f"`npm list` returned non-JSON output: {exc}") from exc
+
+    def _npm_list_at_workspace_root(self) -> dict[str, Any] | None:
+        """
+        Run ``npm list --all --json`` from the workspace root.
+
+        Returns ``None`` when ``self.root`` is the workspace root itself
+        (no extra call needed; the caller already has that data) or when
+        no lockfile-owning ancestor exists.
+        """
+        lock_path = self._find_lockfile()
+        if lock_path is None:
+            return None
+        workspace_root = lock_path.parent
+        if workspace_root.resolve() == self.root.resolve():
+            return None
+        cmd = ["npm", "list", "--all", "--json"]
+        result = subprocess.run(cmd, cwd=workspace_root, capture_output=True, text=True)
+        if result.returncode not in (0, 1) or not result.stdout.strip():
+            return None
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return None
 
     # ------------------------------------------------------------------
     # Fix application
