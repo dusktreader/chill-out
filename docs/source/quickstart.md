@@ -71,6 +71,10 @@ violating dep to its safe version inside `pyproject.toml` and runs `uv lock`.
 When a transitive conflict can't be resolved by hoisting alone, the principal
 gets rolled back to a version that admits the safe transitive.
 
+After applying fixes, `chill-out` re-runs the check automatically so you can
+see whether the fix actually cleared every violation. Pass `--no-recheck` to
+skip that second pass.
+
 
 ## Wire it into CI
 

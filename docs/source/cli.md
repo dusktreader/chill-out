@@ -18,6 +18,8 @@ Options:
       --deep              Include transitive dependencies.
       --fast              Skip the safe-version lookup.
       --fix               Apply fixes for violations that have a safe version.
+      --recheck/          After --fix, re-run the check to confirm the fix
+        --no-recheck      worked (default: --recheck).
   -q, --quiet             Suppress the threshold table.
 ```
 

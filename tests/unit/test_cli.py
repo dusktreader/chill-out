@@ -99,6 +99,36 @@ class TestCheck:
         ):
             result = CliRunner().invoke(cli, ["check", "--root", str(pypi_project), "--fix"])
         assert apply_mock.called
-        # Still exits 2 because violations existed during the check.
+        # The recheck still finds the (mocked) violation, so we still exit 2.
         assert result.exit_code == 2
-        assert "Fix complete" in result.stdout
+        # The default --fix flow also re-runs the check to confirm the fix.
+        assert "Re-checking" in result.stdout
+
+    def test_fix_with_no_recheck_skips_recheck(self, pypi_project: Path) -> None:
+        pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.PYPI)
+        from chill_out.constants import ReleaseType
+
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=SafeVersion(version="1.5.0", age_days=200),
+        )
+        report = CheckReport(ecosystem=EcosystemKind.PYPI, checked=[pkg], violations=[v])
+        with (
+            _patch_check_returning(report) as check_mock,
+            patch(
+                "chill_out.ecosystems.pypi.PypiEcosystem.apply_fixes",
+                return_value=["pinned x -> 1.5.0"],
+            ),
+        ):
+            result = CliRunner().invoke(
+                cli, ["check", "--root", str(pypi_project), "--fix", "--no-recheck"]
+            )
+        assert result.exit_code == 2
+        # Only the initial check ran; --no-recheck suppresses the follow-up.
+        assert check_mock.call_count == 1
+        assert "Re-checking" not in result.stdout
+        assert "Re-run `chill-out check`" in result.stdout

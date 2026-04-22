@@ -78,6 +78,13 @@ def check(
             help="Apply fix actions for any violation that has a known safe version.",
         ),
     ] = False,
+    recheck: Annotated[
+        bool,
+        typer.Option(
+            "--recheck/--no-recheck",
+            help="After --fix, re-run the check to confirm the fix worked. Has no effect without --fix.",
+        ),
+    ] = True,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Suppress threshold table.")] = False,
 ) -> None:
     """Check installed packages against the configured cooldown windows."""
@@ -120,26 +127,32 @@ def check(
         if task_id is not None:
             progress.advance(task_id)
 
+    async def _check_once(http: httpx.AsyncClient, *, plan_fixes: bool) -> tuple[CheckReport, FixPlan | None]:
+        nonlocal task_id
+        task_id = None
+        report = await check_async(
+            eco,
+            config=config,
+            deep=deep,
+            fast=fast,
+            http=http,
+            on_start=_on_start,
+            on_progress=_on_progress,
+        )
+        plan: FixPlan | None = None
+        if plan_fixes and report.has_violations:
+            plan = await plan_fixes_async(report, eco, config=config, http=http)
+        return report, plan
+
     async def _run() -> tuple[CheckReport, FixPlan | None]:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http:
-            report = await check_async(
-                eco,
-                config=config,
-                deep=deep,
-                fast=fast,
-                http=http,
-                on_start=_on_start,
-                on_progress=_on_progress,
-            )
-            plan: FixPlan | None = None
-            if fix and report.has_violations:
-                plan = await plan_fixes_async(report, eco, config=config, http=http)
-            return report, plan
+            return await _check_once(http, plan_fixes=fix)
 
     with progress:
         report, plan = asyncio.run(_run())
     render_report(report, console, config=config, fast=fast)
 
+    fix_applied = False
     if fix and report.has_violations and plan is not None:
         if plan.unfixable:
             console.print(f"[yellow]{len(plan.unfixable)} violation(s) cannot be auto-fixed:[/yellow]")
@@ -152,7 +165,22 @@ def check(
             log = eco.apply_fixes(plan.actions)
             for line in log:
                 console.print(f"  [dim]{line}[/dim]")
-            console.print("[green]Fix complete. Re-run `chill-out check` to verify.[/green]")
+            fix_applied = True
+
+    if fix_applied and recheck:
+        console.print()
+        console.print(f"Re-checking [bold]{eco.kind.value}[/bold] project to verify fixes...")
+
+        async def _recheck() -> CheckReport:
+            async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http:
+                report2, _ = await _check_once(http, plan_fixes=False)
+                return report2
+
+        with progress:
+            report = asyncio.run(_recheck())
+        render_report(report, console, config=config, fast=fast)
+    elif fix_applied:
+        console.print("[green]Fix complete. Re-run `chill-out check` to verify.[/green]")
 
     if report.has_violations:
         raise typer.Exit(code=int(ExitCode.COOLDOWN_VIOLATION))
