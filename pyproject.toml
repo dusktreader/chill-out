@@ -8,18 +8,25 @@ authors = [
 readme = "README.md"
 license-files = ["LICENSE.md"]
 
-requires-python = ">=3.12, ~=3.14"
+requires-python = ">=3.12, <3.15"
 
 dependencies = [
+    "httpx>=0.27",
     "loguru>=0.7",
+    "packaging>=24.0",
+    "pendulum>=3.0",
     "py-buzz>=8.0",
+    "pyyaml>=6.0",
+    "rich>=14.0",
+    "semver>=3.0",
     "snick>=3.0",
+    "tomlkit>=0.13",
     "typer>=0.24.1",
 ]
 
 [project.scripts]
 chill-out = "chill_out.cli.main:cli"
-chill_out-demo = "chill_out_demo.main:main"
+chill-out-demo = "chill_out_demo.main:main"
 
 
 [project.urls]
@@ -28,29 +35,20 @@ source = "https://github.com/dusktreader/chill-out"
 changelog = "https://github.com/dusktreader/chill-out/blob/main/CHANGELOG.md"
 
 
-[project.optional-dependencies]
-demo = [
-    "rich>=14.0",
-    "snick>=3.0",
-    "typer>=0.24.1",
-]
-
-
-
 [dependency-groups]
 dev = [
     "debugpy>=1.8",
     "ipython>=8.18",
-    "mkdocs-material>=9.6",
-    "mkdocstrings[python]>=0.29",
     "pyclean>=3.1",
     "pygments>=2.19",
     "pytest>=8.3",
+    "pytest-asyncio>=0.24",
     "pytest-bdd>=7.0",
     "pytest-cov>=6.0",
     "pytest-mock>=3.14",
     "pytest-pretty>=1.2",
     "pytest-random-order>=1.1",
+    "respx>=0.22",
     "ruff>=0.11",
     "ty>=0.0",
     "typos>=1.31",
@@ -69,8 +67,8 @@ addopts = [
     "--cov-fail-under=85",
     "--cov-report=xml:.coverage.xml",
     "--junitxml=.junit.xml",
-    "--override-ini=junit_family=legacy",
 ]
+asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_steps.py"]
 markers = [
@@ -79,7 +77,10 @@ markers = [
 ]
 
 [tool.coverage.run]
-omit = ["src/chill_out/main.py"]
+omit = [
+    "src/chill_out/main.py",
+    "src/chill_out_demo/*",
+]
 
 
 [tool.ruff]
