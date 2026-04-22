@@ -18,6 +18,22 @@ from chill_out.reporting import render_report, render_thresholds
 from chill_out.runner import check_async, plan_fixes_async
 from chill_out.version import get_version
 
+
+def _make_console() -> Console:
+    """
+    Build the output console.
+
+    When stdout isn't a real terminal (CI runs, captured output, piped output),
+    Rich falls back to an 80-column width which truncates the strategy column.
+    Force a wider canvas in that case so the strategy tree stays legible.
+    Real terminals get their actual width.
+    """
+    import sys
+
+    if sys.stdout.isatty():
+        return Console()
+    return Console(width=140)
+
 cli = typer.Typer(
     name="chill-out",
     help="Manage cooldown for package dependencies to avoid zero-day supply chain vulnerabilities.",
@@ -76,7 +92,7 @@ def check(
     if fix and fast:
         raise typer.BadParameter("--fix requires safe-version lookup; cannot be combined with --fast")
 
-    console = Console()
+    console = _make_console()
     eco = get_ecosystem(ecosystem, root) if ecosystem else detect_ecosystem(root)
     config = load_config(root, eco.kind)
 
@@ -152,7 +168,7 @@ def show_config(
     ] = None,
 ) -> None:
     """Print the resolved cooldown configuration for the project."""
-    console = Console()
+    console = _make_console()
     eco = get_ecosystem(ecosystem, root) if ecosystem else detect_ecosystem(root)
     config = load_config(root, eco.kind)
     console.print(f"Resolved config for [bold]{eco.kind.value}[/bold] at [dim]{root}[/dim]")

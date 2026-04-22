@@ -79,6 +79,44 @@ def _build_via_tree(
     return tree
 
 
+def _fmt_pin(name: str, version: str, age_days: int | None) -> str:
+    """Render a 'pin this package to this version' label for the strategy tree."""
+    age_str = f" [dim]({age_days}d old)[/dim]" if age_days is not None else ""
+    return f"[bold]{name}[/bold] -> [green]{version}[/green]{age_str}"
+
+
+def _build_strategy(violation: Violation) -> Tree | str:
+    """
+    Render the recommended fix recipe for a violation.
+
+    For a principal violation, the strategy is a single pin of the violating
+    package itself. For a transitive, it's a tree showing the chain from the
+    principal down to the transitive, with the leaf labelled as the explicit
+    pin to apply. When no safe version is known, returns a dim 'none' marker
+    so the column still has something to show.
+
+    This is a display-only summary. The actual fix may also need to roll back
+    the principal when the safe transitive version conflicts with whatever
+    the principal's range admits; that decision lives in the planner and
+    surfaces through ``plan_fixes_async``, not here.
+    """
+    if violation.safe_version is None:
+        return "[dim]no safe version found[/dim]"
+
+    pin_label = _fmt_pin(violation.name, violation.safe_version.version, violation.safe_version.age_days)
+
+    if not violation.package.via_chain:
+        return pin_label
+
+    chain_top_down = list(reversed(violation.package.via_chain))
+    tree = Tree(f"[dim]{chain_top_down[0]}[/dim]", guide_style="dim")
+    node = tree
+    for intermediate in chain_top_down[1:]:
+        node = node.add(f"[dim]{intermediate}[/dim]")
+    node.add(pin_label)
+    return tree
+
+
 def render_report(report: CheckReport, console: Console, *, fast: bool = False) -> None:
     """
     Print a summary of the report.
@@ -109,7 +147,7 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
     table.add_column("Age", justify="right")
     table.add_column("Limit", justify="right")
     if not fast:
-        table.add_column("Suggested safe version")
+        table.add_column("Strategy", min_width=45)
 
     for v in sorted(report.violations, key=lambda x: x.name):
         rel_color = _RELEASE_COLOR.get(v.release_type, "white")
@@ -124,10 +162,7 @@ def render_report(report: CheckReport, console: Console, *, fast: bool = False) 
             f"{v.limit_days}d",
         ]
         if not fast:
-            if v.safe_version:
-                row.append(f"[green]{v.safe_version.version}[/green] ({v.safe_version.age_days}d old)")
-            else:
-                row.append("[dim]none[/dim]")
+            row.append(_build_strategy(v))
         table.add_row(*row)
 
     console.print(table)

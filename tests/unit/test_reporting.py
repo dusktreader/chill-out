@@ -52,7 +52,7 @@ class TestRenderReport:
         assert "1.5.0" in out
         assert "violation" in out
 
-    def test_violation_table_fast_omits_safe_column(self) -> None:
+    def test_violation_table_fast_omits_strategy_column(self) -> None:
         pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM)
         v = Violation(
             package=pkg,
@@ -64,7 +64,66 @@ class TestRenderReport:
         )
         report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg], violations=[v])
         out = _capture(render_report, report, fast=True)
-        assert "Suggested" not in out
+        assert "Strategy" not in out
+
+    def test_strategy_column_for_principal_violation(self) -> None:
+        pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM)
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=SafeVersion(version="1.5.0", age_days=200),
+        )
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg], violations=[v])
+        out = _capture(render_report, report)
+        assert "Strategy" in out
+        # Principal pin renders inline (no tree branches needed).
+        assert "x" in out and "1.5.0" in out
+        assert "->" in out
+        assert "200d old" in out
+
+    def test_strategy_column_for_transitive_violation_renders_chain(self) -> None:
+        principal = InstalledPackage(name="principal", version="1.0.0", ecosystem=EcosystemKind.NPM)
+        pkg = InstalledPackage(
+            name="leaf", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)
+        )
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=SafeVersion(version="1.9.0", age_days=42),
+        )
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM, checked=[pkg, principal], violations=[v]
+        )
+        out = _capture(render_report, report)
+        # The strategy column shows the via_chain leading to the explicit leaf
+        # pin so the reader knows it's the transitive that needs pinning, not
+        # the principal.
+        assert "Strategy" in out
+        assert "principal" in out
+        assert "1.9.0" in out
+        assert "42d old" in out
+        # The leaf pin uses the arrow marker.
+        assert "leaf" in out and "->" in out
+
+    def test_strategy_column_when_no_safe_version(self) -> None:
+        pkg = InstalledPackage(name="x", version="2.0.0", ecosystem=EcosystemKind.NPM)
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=None,
+        )
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg], violations=[v])
+        out = _capture(render_report, report)
+        assert "no safe version found" in out
 
     def test_transitive_violation_renders_dep_tree(self) -> None:
         principal = InstalledPackage(name="principal", version="1.0.0", ecosystem=EcosystemKind.NPM)
