@@ -1,0 +1,6 @@
+# chill-out configuration for chill-out itself.
+#
+# Defaults handle everything we need (main-only, standard cooldown
+# thresholds), so this file mostly exists for discoverability and to
+# pin the fix style we want when running --fix.
+fix_style: compatible

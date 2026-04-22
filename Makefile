@@ -23,7 +23,10 @@ qa/lint:  ## Run linters
 	@uv run ruff check ${PACKAGE_TARGET} tests src/chill_out_demo examples
 	@uv run typos ${PACKAGE_TARGET} tests src/chill_out_demo docs/source
 
-qa/full: qa/test qa/lint qa/types  ## Run the full set of quality checks
+qa/chill:  ## Dogfood: check our own dependency cooldowns
+	@uv run chill-out check
+
+qa/full: qa/test qa/lint qa/types qa/chill  ## Run the full set of quality checks
 	@echo "All quality checks pass!"
 
 qa/format:  ## Run code formatter
@@ -96,7 +99,7 @@ help:  ## Show help message
 
 .ONESHELL:
 SHELL:=/bin/bash
-.PHONY: qa qa/test qa/test/unit qa/test/integration qa/types qa/lint qa/full qa/format \
+.PHONY: qa qa/test qa/test/unit qa/test/integration qa/types qa/lint qa/chill qa/full qa/format \
 	docs docs/build docs/serve \
 	app app/run app/debug \
 	demo demo/run demo/debug \
