@@ -220,3 +220,54 @@ class TestIncludeGroups:
         (tmp_path / ".chill-out.yaml").write_text("include_groups: []\n")
         cfg = load_config(tmp_path, EcosystemKind.NPM)
         assert cfg.include_groups == ()
+
+
+class TestFixStyleConfig:
+    """Layered loading and validation for the ``fix_style`` setting."""
+
+    def test_default_is_exact(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        assert cfg.fix_style is FixStyle.EXACT
+
+    def test_yaml_can_set_compatible(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+
+        (tmp_path / ".chill-out.yaml").write_text("fix_style: compatible\n")
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        assert cfg.fix_style is FixStyle.COMPATIBLE
+
+    def test_pyproject_can_set_compatible(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+
+        (tmp_path / "pyproject.toml").write_text(
+            '[tool.chill-out]\nfix_style = "compatible"\n'
+        )
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        assert cfg.fix_style is FixStyle.COMPATIBLE
+
+    def test_package_json_can_set_compatible(self, tmp_path: Path) -> None:
+        import json as _json
+
+        from chill_out.constants import FixStyle
+
+        (tmp_path / "package.json").write_text(
+            _json.dumps({"chill-out": {"fix_style": "compatible"}})
+        )
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.fix_style is FixStyle.COMPATIBLE
+
+    def test_yaml_overrides_pyproject(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+
+        (tmp_path / "pyproject.toml").write_text('[tool.chill-out]\nfix_style = "exact"\n')
+        (tmp_path / ".chill-out.yaml").write_text("fix_style: compatible\n")
+        cfg = load_config(tmp_path, EcosystemKind.PYPI)
+        # Highest-priority source wins wholesale.
+        assert cfg.fix_style is FixStyle.COMPATIBLE
+
+    def test_unknown_style_raises_config_error(self, tmp_path: Path) -> None:
+        (tmp_path / ".chill-out.yaml").write_text("fix_style: aggressive\n")
+        with pytest.raises(ConfigError, match="Unknown fix_style"):
+            load_config(tmp_path, EcosystemKind.PYPI)

@@ -27,9 +27,11 @@ import yaml
 
 from chill_out.constants import (
     DEFAULT_COOLDOWN_DAYS,
+    DEFAULT_FIX_STYLE,
     DEFAULT_INCLUDE_GROUPS,
     DependencyGroup,
     EcosystemKind,
+    FixStyle,
     ReleaseType,
 )
 from chill_out.exceptions import ConfigError
@@ -40,7 +42,7 @@ class ChillOutConfig:
     """
     Resolved chill-out configuration.
 
-    Holds two independent settings:
+    Holds three independent settings:
 
     * ``cooldown_days`` -- per release-type cooldown thresholds in days.
       ``ReleaseType.DEFAULT`` is used whenever a release's release type is
@@ -51,10 +53,13 @@ class ChillOutConfig:
       lookups happen. The default is restricted to ``main`` so dev and
       optional dependencies don't trip cooldown checks unless the project
       opts them in explicitly.
+    * ``fix_style`` -- how ``--fix`` writes the new version constraint.
+      See :class:`chill_out.constants.FixStyle` for the available styles.
     """
 
     cooldown_days: dict[ReleaseType, int] = field(default_factory=lambda: dict(DEFAULT_COOLDOWN_DAYS))
     include_groups: tuple[DependencyGroup, ...] = DEFAULT_INCLUDE_GROUPS
+    fix_style: FixStyle = DEFAULT_FIX_STYLE
 
     def for_release_type(self, rel_type: ReleaseType) -> int:
         """Return the threshold (days) for the given release type, falling back to default."""
@@ -138,10 +143,30 @@ class _Layer:
 
     cooldown_days: dict[ReleaseType, int] = field(default_factory=dict)
     include_groups: tuple[DependencyGroup, ...] | None = None
+    fix_style: FixStyle | None = None
+
+
+def _coerce_fix_style(raw: Any, *, source: str) -> FixStyle | None:
+    """
+    Map a raw fix-style value into a typed :class:`FixStyle`.
+
+    Returns ``None`` when the value is missing so the caller can distinguish
+    "not configured" from "explicitly set". Unknown names raise
+    :class:`ConfigError` with the list of valid choices.
+    """
+    if raw is None:
+        return None
+    name = str(raw).lower()
+    valid = {s.value for s in FixStyle}
+    if name not in valid:
+        raise ConfigError(
+            f"Unknown fix_style {raw!r} in {source}; valid choices are {sorted(valid)}"
+        )
+    return FixStyle(name)
 
 
 def load_chill_out_yaml(root: Path) -> _Layer:
-    """Load thresholds and group filters from a top-level ``.chill-out.yaml`` (or ``.yml``) file."""
+    """Load thresholds, group filters, and fix style from a top-level ``.chill-out.yaml`` (or ``.yml``) file."""
     for name in (".chill-out.yaml", ".chill-out.yml"):
         path = root / name
         if not path.is_file():
@@ -155,12 +180,13 @@ def load_chill_out_yaml(root: Path) -> _Layer:
         cooldown = doc.get("cooldown")
         days = _coerce_days(cooldown) if isinstance(cooldown, dict) else {}
         groups = _coerce_groups(doc.get("include_groups"), source=str(path))
-        return _Layer(cooldown_days=days, include_groups=groups)
+        style = _coerce_fix_style(doc.get("fix_style"), source=str(path))
+        return _Layer(cooldown_days=days, include_groups=groups, fix_style=style)
     return _Layer()
 
 
 def load_pyproject_table(root: Path) -> _Layer:
-    """Load thresholds and group filters from ``[tool.chill-out]`` in pyproject.toml."""
+    """Load thresholds, group filters, and fix style from ``[tool.chill-out]`` in pyproject.toml."""
     path = root / "pyproject.toml"
     if not path.is_file():
         return _Layer()
@@ -175,23 +201,25 @@ def load_pyproject_table(root: Path) -> _Layer:
     cooldown = co.get("cooldown", {})
     days = _coerce_days(dict(cooldown)) if isinstance(cooldown, dict) else {}
     groups = _coerce_groups(co.get("include_groups"), source=str(path))
-    return _Layer(cooldown_days=days, include_groups=groups)
+    style = _coerce_fix_style(co.get("fix_style"), source=str(path))
+    return _Layer(cooldown_days=days, include_groups=groups, fix_style=style)
 
 
 def load_package_json(root: Path) -> _Layer:
     """
-    Load thresholds and group filters from a top-level ``"chill-out"`` key in ``package.json``.
+    Load thresholds, group filters, and fix style from a top-level ``"chill-out"`` key in ``package.json``.
 
     The key may either contain a flat day map (legacy shape), or a fully
-    nested object with ``"cooldown"`` and ``"include_groups"`` sub-keys to
-    mirror the pyproject and yaml shapes:
+    nested object with ``"cooldown"``, ``"include_groups"``, and
+    ``"fix_style"`` sub-keys to mirror the pyproject and yaml shapes:
 
     .. code-block:: json
 
         {
           "chill-out": {
             "cooldown": {"major": 30, "minor": 14, "patch": 7, "default": 7},
-            "include_groups": ["main", "dev"]
+            "include_groups": ["main", "dev"],
+            "fix_style": "compatible"
           }
         }
     """
@@ -208,14 +236,15 @@ def load_package_json(root: Path) -> _Layer:
     cooldown = block.get("cooldown", block)
     days = _coerce_days(cooldown) if isinstance(cooldown, dict) else {}
     groups = _coerce_groups(block.get("include_groups"), source=str(path))
-    return _Layer(cooldown_days=days, include_groups=groups)
+    style = _coerce_fix_style(block.get("fix_style"), source=str(path))
+    return _Layer(cooldown_days=days, include_groups=groups, fix_style=style)
 
 
 def load_dependabot(root: Path, ecosystem: EcosystemKind) -> _Layer:
     """Load thresholds from ``.github/dependabot.yml`` for the matching ecosystem.
 
-    Dependabot has no concept of dependency-group filtering, so this loader
-    only ever supplies cooldown thresholds.
+    Dependabot has no concept of dependency-group filtering or fix style, so
+    this loader only ever supplies cooldown thresholds.
     """
     path = root / ".github" / "dependabot.yml"
     if not path.is_file():
@@ -241,8 +270,9 @@ def load_config(root: Path, ecosystem: EcosystemKind) -> ChillOutConfig:
     Resolve the effective chill-out configuration for the given project root and ecosystem.
 
     Layers are merged so higher-priority sources override lower ones.
-    Cooldown thresholds merge key-by-key; ``include_groups`` is taken
-    wholesale from the highest-priority source that supplies it.
+    Cooldown thresholds merge key-by-key; ``include_groups`` and
+    ``fix_style`` are each taken wholesale from the highest-priority source
+    that supplies them.
     """
     layers = [
         load_dependabot(root, ecosystem),
@@ -253,8 +283,13 @@ def load_config(root: Path, ecosystem: EcosystemKind) -> ChillOutConfig:
 
     merged_days: dict[ReleaseType, int] = dict(DEFAULT_COOLDOWN_DAYS)
     merged_groups: tuple[DependencyGroup, ...] = DEFAULT_INCLUDE_GROUPS
+    merged_style: FixStyle = DEFAULT_FIX_STYLE
     for layer in layers:
         merged_days.update(layer.cooldown_days)
         if layer.include_groups is not None:
             merged_groups = layer.include_groups
-    return ChillOutConfig(cooldown_days=merged_days, include_groups=merged_groups)
+        if layer.fix_style is not None:
+            merged_style = layer.fix_style
+    return ChillOutConfig(
+        cooldown_days=merged_days, include_groups=merged_groups, fix_style=merged_style
+    )

@@ -8,8 +8,14 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
-from chill_out.constants import EcosystemKind
-from chill_out.ecosystems.pypi import PYPI_REGISTRY, PypiEcosystem, PypiRegistryClient, _normalize
+from chill_out.constants import EcosystemKind, FixStyle
+from chill_out.ecosystems.pypi import (
+    PYPI_REGISTRY,
+    PypiEcosystem,
+    PypiRegistryClient,
+    _format_pypi_spec,
+    _normalize,
+)
 from chill_out.exceptions import EcosystemError, RegistryError
 from chill_out.models import FixAction
 
@@ -564,3 +570,108 @@ class TestPypiEcosystemGroupAttribution:
         assert pkgs["dev-only-lib"].groups == (DependencyGroup.DEV,)
         # Shared transitive accumulates both groups (sorted alphabetically by enum value).
         assert pkgs["shared-lib"].groups == (DependencyGroup.DEV, DependencyGroup.MAIN)
+
+
+class TestFormatPypiSpec:
+    """Direct tests for the spec-rendering helper used by both --fix paths."""
+
+    def test_exact_style_writes_double_equals(self) -> None:
+        from packaging.specifiers import SpecifierSet
+
+        out = _format_pypi_spec("requests", "2.30.0", SpecifierSet(">=2.0"), FixStyle.EXACT)
+        assert out == "requests==2.30.0"
+
+    def test_compatible_style_caps_at_next_major(self) -> None:
+        out = _format_pypi_spec("requests", "2.30.0", None, FixStyle.COMPATIBLE)
+        # No prior lower bound -> safe version becomes the floor.
+        assert out == "requests>=2.30.0,<3.0.0"
+
+    def test_compatible_style_preserves_existing_lower_bound(self) -> None:
+        from packaging.specifiers import SpecifierSet
+
+        out = _format_pypi_spec("rich", "14.3.4", SpecifierSet(">=14.0"), FixStyle.COMPATIBLE)
+        assert out == "rich>=14.0,<15.0.0"
+
+    def test_compatible_style_picks_highest_usable_lower_bound(self) -> None:
+        from packaging.specifiers import SpecifierSet
+
+        # Multiple >= clauses (uncommon but legal); pick the largest that
+        # doesn't exceed the safe version.
+        spec = SpecifierSet(">=14.0,>=14.1,>=14.5")
+        out = _format_pypi_spec("rich", "14.3.4", spec, FixStyle.COMPATIBLE)
+        # 14.5 > 14.3.4, so it's discarded; 14.1 is the highest usable.
+        assert out == "rich>=14.1,<15.0.0"
+
+    def test_compatible_style_discards_lower_bound_above_safe(self) -> None:
+        from packaging.specifiers import SpecifierSet
+
+        spec = SpecifierSet(">=15.0")
+        out = _format_pypi_spec("rich", "14.3.4", spec, FixStyle.COMPATIBLE)
+        # The user's floor would forbid the safe version itself; fall back
+        # to the safe version as the floor.
+        assert out == "rich>=14.3.4,<15.0.0"
+
+    def test_compatible_style_handles_zero_major(self) -> None:
+        # 0.x releases get capped at <1.0.0, matching the next-major rule
+        # uniformly. (Some ecosystems treat 0.x as "every minor breaks",
+        # but the user opted into compatible explicitly.)
+        out = _format_pypi_spec("alpha", "0.7.2", None, FixStyle.COMPATIBLE)
+        assert out == "alpha>=0.7.2,<1.0.0"
+
+    def test_compatible_style_falls_back_to_exact_for_invalid_version(self) -> None:
+        # Non-PEP-440 strings can't be parsed for major; fall back to exact.
+        out = _format_pypi_spec("weird", "not-a-version", None, FixStyle.COMPATIBLE)
+        assert out == "weird==not-a-version"
+
+
+class TestPypiApplyFixesCompatibleStyle:
+    """End-to-end ``apply_fixes`` checks for ``FixStyle.COMPATIBLE``."""
+
+    def test_writes_range_preserving_lower_bound(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="x"\nversion="0"\ndependencies = ["rich>=14.0"]\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        action = FixAction(package="rich", version="14.3.4", style=FixStyle.COMPATIBLE)
+        with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):
+            log = eco.apply_fixes([action])
+        contents = (tmp_path / "pyproject.toml").read_text()
+        assert "rich>=14.0,<15.0.0" in contents
+        assert "rich==14.3.4" not in contents
+        assert any("rich>=14.0,<15.0.0" in line for line in log)
+
+    def test_writes_range_when_dependency_is_brand_new(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="x"\nversion="0"\ndependencies = []\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        action = FixAction(package="newpkg", version="1.2.3", style=FixStyle.COMPATIBLE)
+        with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):
+            log = eco.apply_fixes([action])
+        contents = (tmp_path / "pyproject.toml").read_text()
+        assert "newpkg>=1.2.3,<2.0.0" in contents
+        assert any("newpkg>=1.2.3,<2.0.0" in line for line in log)
+
+    def test_override_action_stays_exact_even_with_compatible_style(self, tmp_path: Path) -> None:
+        # Direct entry exists for unrelated package so the direct-fix path
+        # has something to do; the override goes through the override
+        # writer, which always emits ``==``.
+        (tmp_path / "pyproject.toml").write_text(
+            '[project]\nname="x"\nversion="0"\ndependencies = ["unrelated>=1.0"]\n'
+        )
+        eco = PypiEcosystem(tmp_path)
+        fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        override = FixAction(
+            package="bad-transitive",
+            version="1.0.0",
+            via_overrides=True,
+            style=FixStyle.COMPATIBLE,  # ignored on override actions
+        )
+        with patch("chill_out.ecosystems.pypi.subprocess.run", return_value=fake):
+            eco.apply_fixes([override])
+        contents = (tmp_path / "pyproject.toml").read_text()
+        # Override was written exactly, not as a range.
+        assert "bad-transitive==1.0.0" in contents
+        assert ">=1.0.0,<2.0.0" not in contents

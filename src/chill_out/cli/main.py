@@ -11,10 +11,10 @@ import typer
 from rich.console import Console
 
 from chill_out.config import load_config
-from chill_out.constants import EcosystemKind, ExitCode
+from chill_out.constants import EcosystemKind, ExitCode, FixStyle
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.exceptions import handle_errors
-from chill_out.reporting import render_include_groups, render_report, render_thresholds
+from chill_out.reporting import render_fix_style, render_include_groups, render_report, render_thresholds
 from chill_out.runner import check_async, plan_fixes_async
 from chill_out.version import get_version
 
@@ -78,6 +78,18 @@ def check(
             help="Apply fix actions for any violation that has a known safe version.",
         ),
     ] = False,
+    fix_style: Annotated[
+        FixStyle | None,
+        typer.Option(
+            "--fix-style",
+            help=(
+                "Override the configured fix_style for this run. 'exact' pins to "
+                "the safe version (pkg==X.Y.Z / X.Y.Z); 'compatible' writes a "
+                "range that admits the safe version's major (>=X.Y.Z,<M+1.0.0 / "
+                "^X.Y.Z). Has no effect without --fix."
+            ),
+        ),
+    ] = None,
     recheck: Annotated[
         bool,
         typer.Option(
@@ -102,6 +114,11 @@ def check(
     console = _make_console()
     eco = get_ecosystem(ecosystem, root) if ecosystem else detect_ecosystem(root)
     config = load_config(root, eco.kind)
+    if fix_style is not None:
+        # CLI override beats every config layer for this single run.
+        from dataclasses import replace
+
+        config = replace(config, fix_style=fix_style)
 
     if not quiet:
         render_thresholds(config, console)
@@ -249,3 +266,4 @@ def show_config(
     console.print(f"Resolved config for [bold]{eco.kind.value}[/bold] at [dim]{root}[/dim]")
     render_thresholds(config, console)
     render_include_groups(config, console)
+    render_fix_style(config, console)

@@ -697,3 +697,86 @@ class TestFilterByGroups:
         names_checked = {p.name for p in report.checked}
         # Only the MAIN package is in the checked set; dev-pkg never made it past the filter.
         assert names_checked == {"prod-pkg"}
+
+
+class TestPlanFixesStylePlumbing:
+    """``plan_fixes`` and ``plan_fixes_async`` thread style through correctly.
+
+    These exercise the planning layer only; rendering of the final spec
+    string is covered by the per-ecosystem tests.
+    """
+
+    def _violation(self, now, *, via_chain=(), member_owners=()):
+        from chill_out.models import InstalledPackage, SafeVersion, Violation
+
+        return Violation(
+            package=InstalledPackage(
+                name="x",
+                version="2.0.0",
+                ecosystem=EcosystemKind.NPM,
+                via_chain=via_chain,
+                member_owners=member_owners,
+            ),
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=now.subtract(days=2),
+            safe_version=SafeVersion(version="1.5.0", age_days=200),
+        )
+
+    def test_plan_fixes_threads_explicit_style(self, now) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import CheckReport
+        from chill_out.runner import plan_fixes
+
+        v = self._violation(now)
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
+        plan = plan_fixes(report, fix_style=FixStyle.COMPATIBLE)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].style is FixStyle.COMPATIBLE
+
+    def test_plan_fixes_defaults_to_exact(self, now) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import CheckReport
+        from chill_out.runner import plan_fixes
+
+        v = self._violation(now)
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
+        plan = plan_fixes(report)
+        assert plan.actions[0].style is FixStyle.EXACT
+
+    async def test_plan_fixes_async_uses_config_style_for_simple_pin(self, now, config) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import CheckReport
+        from chill_out.runner import plan_fixes_async
+        from dataclasses import replace
+
+        v = self._violation(now)
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
+        cfg = replace(config, fix_style=FixStyle.COMPATIBLE)
+        eco = _FakeEcosystem(packages=[v.package], data={}, manifests={})
+        plan = await plan_fixes_async(report, eco, config=cfg, now=now)
+        assert plan.actions[0].style is FixStyle.COMPATIBLE
+        assert plan.actions[0].via_overrides is False
+
+    async def test_plan_fixes_async_forces_exact_for_override_actions(self, now, config) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import CheckReport
+        from chill_out.runner import plan_fixes_async
+        from dataclasses import replace
+
+        # Shared transitive: more than one workspace member owner triggers
+        # ``is_shared``, and ``via_chain`` makes it transitive. Together
+        # those are what flip the planner into the override path.
+        v = self._violation(now, via_chain=("principal",), member_owners=("a", "b"))
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[v.package], violations=[v])
+        cfg = replace(config, fix_style=FixStyle.COMPATIBLE)
+        # Principal isn't in the installed set, so plan_fixes_async takes
+        # the early-out branch that pins the transitive directly via the
+        # ``pin()`` helper; the override path is selected purely by
+        # is_shared+via, and our config asks for COMPATIBLE which the
+        # helper must downgrade to EXACT for safety.
+        eco = _FakeEcosystem(packages=[v.package], data={}, manifests={})
+        plan = await plan_fixes_async(report, eco, config=cfg, now=now)
+        assert plan.actions[0].via_overrides is True
+        assert plan.actions[0].style is FixStyle.EXACT

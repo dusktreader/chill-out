@@ -19,7 +19,7 @@ import httpx
 import pendulum
 from loguru import logger
 
-from chill_out.constants import DependencyGroup, EcosystemKind
+from chill_out.constants import DependencyGroup, EcosystemKind, FixStyle
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
 from chill_out.models import (
@@ -550,8 +550,9 @@ class NpmEcosystem(Ecosystem):
         deps = root_pkg.setdefault("dependencies", {})
 
         for action in actions:
-            deps[action.package] = action.version
-            log.append(f"pinned {action.package} -> {action.version}")
+            spec = _format_npm_spec(action.version, action.style)
+            deps[action.package] = spec
+            log.append(f"pinned {action.package} -> {spec}")
 
         root_pkg_path.write_text(json.dumps(root_pkg, indent=2) + "\n")
 
@@ -602,3 +603,20 @@ class NpmEcosystem(Ecosystem):
             raise EcosystemError(f"`npm install` failed after applying overrides: {result.stderr.strip()}")
         log.append(f"ran: npm install (in {workspace_root})")
         return log
+
+
+def _format_npm_spec(version: str, style: FixStyle) -> str:
+    """Render the new dependency value for an npm pin.
+
+    For :attr:`FixStyle.EXACT` the result is the bare version string
+    (``X.Y.Z``), which npm treats as an exact pin.
+
+    For :attr:`FixStyle.COMPATIBLE` the result is the caret form
+    (``^X.Y.Z``), which npm interprets as "any release that doesn't change
+    the leftmost non-zero component". For non-prerelease versions with a
+    nonzero major this is equivalent to ``>={version},<{M+1}.0.0``, the
+    same shape pypi's compatible style produces.
+    """
+    if style is FixStyle.EXACT:
+        return version
+    return f"^{version}"

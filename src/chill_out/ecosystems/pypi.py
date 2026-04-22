@@ -23,7 +23,7 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 
-from chill_out.constants import DependencyGroup, EcosystemKind
+from chill_out.constants import DependencyGroup, EcosystemKind, FixStyle
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
 from chill_out.exceptions import EcosystemError, RegistryError
 from chill_out.models import (
@@ -469,15 +469,16 @@ class PypiEcosystem(Ecosystem):
         log: list[str] = []
 
         for action in actions:
-            replaced = _pin_dependency(doc, action.package, action.version)
-            if replaced:
-                log.append(f"pinned {action.package} -> {action.version}")
+            replacement = _pin_dependency(doc, action.package, action.version, action.style)
+            if replacement is not None:
+                log.append(f"pinned {action.package} -> {replacement}")
             else:
                 # Add to project.dependencies if it isn't declared anywhere.
                 project = doc.setdefault("project", tomlkit.table())
                 deps = project.setdefault("dependencies", tomlkit.array())
-                deps.append(f"{action.package}=={action.version}")
-                log.append(f"added {action.package}=={action.version} to project.dependencies")
+                fresh = _format_pypi_spec(action.package, action.version, None, action.style)
+                deps.append(fresh)
+                log.append(f"added {fresh} to project.dependencies")
 
         path.write_text(tomlkit.dumps(doc))
 
@@ -573,18 +574,28 @@ def _extract_pinned_version(spec: str) -> str | None:
     return None
 
 
-def _pin_dependency(doc: Any, package: str, version: str) -> bool:
+def _pin_dependency(doc: Any, package: str, version: str, style: FixStyle) -> str | None:
     """
-    Replace any existing requirement string for ``package`` with ``package==version``
-    in either ``project.dependencies``, ``project.optional-dependencies``, or
-    ``dependency-groups``. Returns True if anything was replaced.
+    Replace any existing requirement string for ``package`` in either
+    ``project.dependencies``, ``project.optional-dependencies``, or
+    ``dependency-groups`` with a new spec built from ``version`` and
+    ``style``.
+
+    Returns the new spec string when something was replaced, or ``None``
+    when no entry for ``package`` was found. The first replacement's
+    formatted spec is returned; later replacements (if the package appears
+    in multiple sections) reuse the same shape.
+
+    For ``FixStyle.COMPATIBLE``, the existing entry's lower bound is
+    preserved when present so the user's declared floor isn't accidentally
+    raised; otherwise ``>={version}`` is used as the new floor. The upper
+    bound is always the next major (``<{M+1}.0.0``) under the safe version.
     """
     target = _normalize(package)
-    new_spec = f"{package}=={version}"
-    replaced = False
+    replaced_spec: str | None = None
 
     def rewrite(items: Any) -> None:
-        nonlocal replaced
+        nonlocal replaced_spec
         if items is None:
             return
         for idx in range(len(items)):
@@ -593,9 +604,12 @@ def _pin_dependency(doc: Any, package: str, version: str) -> bool:
                 req = Requirement(raw)
             except InvalidRequirement:
                 continue
-            if _normalize(req.name) == target:
-                items[idx] = new_spec
-                replaced = True
+            if _normalize(req.name) != target:
+                continue
+            new_spec = _format_pypi_spec(package, version, req.specifier, style)
+            items[idx] = new_spec
+            if replaced_spec is None:
+                replaced_spec = new_spec
 
     project = doc.get("project")
     if isinstance(project, dict):
@@ -608,4 +622,62 @@ def _pin_dependency(doc: Any, package: str, version: str) -> bool:
         for items in groups.values():
             rewrite(items)
 
-    return replaced
+    return replaced_spec
+
+
+def _format_pypi_spec(
+    package: str,
+    version: str,
+    existing: SpecifierSet | None,
+    style: FixStyle,
+) -> str:
+    """Render the new requirement string for a pypi pin.
+
+    For :attr:`FixStyle.EXACT` the result is ``{package}=={version}``.
+
+    For :attr:`FixStyle.COMPATIBLE` the result is
+    ``{package}>={lower},<{M+1}.0.0`` where ``M`` is the safe version's
+    major component. ``lower`` is the highest ``>=`` bound the user already
+    declared (only kept when it doesn't exceed ``version``); otherwise it
+    falls back to ``version`` itself.
+    """
+    if style is FixStyle.EXACT:
+        return f"{package}=={version}"
+
+    try:
+        safe = Version(version)
+    except InvalidVersion:
+        # Can't reason about the version structure; fall back to exact.
+        return f"{package}=={version}"
+
+    upper = f"<{safe.major + 1}.0.0"
+    lower_str = _existing_lower_bound(existing, safe)
+    if lower_str is None:
+        lower_str = version
+    return f"{package}>={lower_str},{upper}"
+
+
+def _existing_lower_bound(spec: SpecifierSet | None, safe: Version) -> str | None:
+    """
+    Return the highest ``>=`` lower bound declared in ``spec`` that is
+    still ``<= safe``. Returns ``None`` when no usable lower bound exists.
+
+    Bounds higher than the safe version would forbid the safe version
+    itself, so they're discarded -- the caller falls back to using the
+    safe version as the floor instead.
+    """
+    if spec is None:
+        return None
+    candidates: list[Version] = []
+    for sp in spec:
+        if sp.operator != ">=":
+            continue
+        try:
+            v = Version(sp.version)
+        except InvalidVersion:
+            continue
+        if v <= safe:
+            candidates.append(v)
+    if not candidates:
+        return None
+    return str(max(candidates))

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pendulum
 
-from chill_out.constants import DependencyGroup, ReleaseType, EcosystemKind
+from chill_out.constants import DependencyGroup, FixStyle, ReleaseType, EcosystemKind
 
 
 @dataclass(frozen=True)
@@ -152,6 +152,12 @@ class FixAction:
     (``project.dependencies`` for pypi, ``dependencies`` for npm). Transitive
     pins ride along as direct entries; the ecosystem resolver hoists them.
 
+    ``style`` controls how the new constraint is rendered into the manifest.
+    See :class:`chill_out.constants.FixStyle` for the available choices.
+    Override-style actions (``via_overrides=True``) are always written as
+    exact pins regardless of ``style``, since the whole point of an override
+    is to dodge a specific just-released version.
+
     When ``via_overrides`` is True the pin should be applied via the
     ecosystem's "force every transitive copy" mechanism instead of a direct
     dependency entry. The runner sets this for shared transitive
@@ -162,6 +168,7 @@ class FixAction:
     package: str
     version: str
     via_overrides: bool = False
+    style: FixStyle = FixStyle.EXACT
 
 
 @dataclass(frozen=True)

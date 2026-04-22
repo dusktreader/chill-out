@@ -828,3 +828,63 @@ class TestNpmEcosystemGroupAttribution:
                 with patch.object(NpmEcosystem, "_find_workspace_member", return_value=None):
                     pkgs = {p.name: p for p in eco.load_installed(deep=True)}
         assert pkgs["shared-lib"].groups == (DependencyGroup.DEV, DependencyGroup.MAIN)
+
+
+class TestFormatNpmSpec:
+    """Direct tests for the npm spec-rendering helper."""
+
+    def test_exact_style_writes_bare_version(self) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.ecosystems.npm import _format_npm_spec
+
+        assert _format_npm_spec("1.2.3", FixStyle.EXACT) == "1.2.3"
+
+    def test_compatible_style_writes_caret(self) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.ecosystems.npm import _format_npm_spec
+
+        assert _format_npm_spec("1.2.3", FixStyle.COMPATIBLE) == "^1.2.3"
+
+
+class TestNpmApplyFixesCompatibleStyle:
+    """End-to-end ``apply_fixes`` checks for ``FixStyle.COMPATIBLE``."""
+
+    def test_writes_caret_into_dependencies(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import FixAction
+
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "x", "version": "0.0.0", "dependencies": {"left-pad": "^1.0.0"}})
+        )
+        eco = NpmEcosystem(tmp_path)
+        fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        action = FixAction(package="left-pad", version="1.2.0", style=FixStyle.COMPATIBLE)
+        with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake):
+            log = eco.apply_fixes([action])
+        contents = json.loads((tmp_path / "package.json").read_text())
+        assert contents["dependencies"]["left-pad"] == "^1.2.0"
+        assert any("^1.2.0" in line for line in log)
+
+    def test_override_action_stays_exact_even_with_compatible_style(self, tmp_path: Path) -> None:
+        from chill_out.constants import FixStyle
+        from chill_out.models import FixAction
+
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "x", "version": "0.0.0", "dependencies": {}})
+        )
+        # Pretend there's a lockfile next to the manifest so the override
+        # path treats this directory as the workspace root.
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        fake = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        override = FixAction(
+            package="bad-transitive",
+            version="1.0.0",
+            via_overrides=True,
+            style=FixStyle.COMPATIBLE,  # ignored on override actions
+        )
+        with patch("chill_out.ecosystems.npm.subprocess.run", return_value=fake):
+            eco.apply_fixes([override])
+        contents = json.loads((tmp_path / "package.json").read_text())
+        # Override was written exactly, not as a caret range.
+        assert contents["overrides"]["bad-transitive"] == "1.0.0"

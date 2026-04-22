@@ -17,7 +17,7 @@ from loguru import logger
 
 from chill_out.cache import CachingRegistryClient
 from chill_out.config import CooldownConfig, load_config
-from chill_out.constants import DEFAULT_CONCURRENCY, DEFAULT_TIMEOUT, EcosystemKind
+from chill_out.constants import DEFAULT_CONCURRENCY, DEFAULT_TIMEOUT, EcosystemKind, FixStyle
 from chill_out.cooldown import find_safe_principal_version, find_safe_version, is_within_cooldown, release_type
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
 from chill_out.ecosystems.base import Ecosystem, RegistryClient
@@ -173,7 +173,7 @@ def check(
     )
 
 
-def plan_fixes(report: CheckReport) -> FixPlan:
+def plan_fixes(report: CheckReport, *, fix_style: FixStyle = FixStyle.EXACT) -> FixPlan:
     """
     Build a basic fix plan from a report, without principal range checking.
 
@@ -184,6 +184,9 @@ def plan_fixes(report: CheckReport) -> FixPlan:
     declared range. Violations with no known safe version land in
     :attr:`FixPlan.unfixable` so the caller can report them.
 
+    The ``fix_style`` parameter controls how each pin is rendered into the
+    manifest. See :class:`chill_out.constants.FixStyle`.
+
     For the smarter version that range-checks transitive pins against the
     installed principal and rolls the principal back when the declared range
     can't admit the safe transitive, use :func:`plan_fixes_async`.
@@ -193,7 +196,9 @@ def plan_fixes(report: CheckReport) -> FixPlan:
         if v.safe_version is None:
             plan.unfixable.append(UnfixableViolation(v, "no safe version found within the cooldown window"))
             continue
-        plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+        plan.actions.append(
+            FixAction(package=v.name, version=v.safe_version.version, style=fix_style)
+        )
     plan.actions = _dedupe_actions(plan.actions)
     return plan
 
@@ -235,6 +240,7 @@ async def plan_fixes_async(
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
+    fix_style = config.fix_style
 
     own_http = http is None
     if own_http:
@@ -253,9 +259,15 @@ async def plan_fixes_async(
         violations on the current project's own manifest stay as plain pins
         even when the package happens to be shared, since the user
         explicitly declared it here.
+
+        Override-bound actions are forced to ``FixStyle.EXACT`` regardless
+        of the configured style, because the entire reason an override
+        exists is to dodge a specific just-released version: a range there
+        would let the resolver wander right back into the cooldown window.
         """
         use_overrides = v.is_shared and bool(v.via)
-        return FixAction(package=v.name, version=version, via_overrides=use_overrides)
+        style = FixStyle.EXACT if use_overrides else fix_style
+        return FixAction(package=v.name, version=version, via_overrides=use_overrides, style=style)
 
     plan = FixPlan()
     try:
@@ -342,8 +354,17 @@ async def plan_fixes_async(
                     )
                 )
                 continue
-            plan.actions.append(FixAction(package=v.via, version=principal_safe.version))
-            plan.actions.append(FixAction(package=v.name, version=v.safe_version.version))
+            # Principal rollback uses an exact pin regardless of fix_style:
+            # a range here would let the resolver pick the latest in-range
+            # principal, which could land back on the conflicting version.
+            # The paired transitive pin is also exact so the two halves of
+            # the rollback can't drift apart on the next install.
+            plan.actions.append(
+                FixAction(package=v.via, version=principal_safe.version, style=FixStyle.EXACT)
+            )
+            plan.actions.append(
+                FixAction(package=v.name, version=v.safe_version.version, style=FixStyle.EXACT)
+            )
     finally:
         if own_http:
             await http.aclose()

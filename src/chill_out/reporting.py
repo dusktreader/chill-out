@@ -49,6 +49,11 @@ def render_include_groups(config: CooldownConfig, console: Console) -> None:
     console.print(f"Included groups: [bold]{label}[/bold]")
 
 
+def render_fix_style(config: CooldownConfig, console: Console) -> None:
+    """Print the configured ``fix_style`` as a single-line label."""
+    console.print(f"Fix style: [bold]{config.fix_style.value}[/bold]")
+
+
 def _fmt_groups(groups: tuple[DependencyGroup, ...]) -> str:
     """Render a compact ``[group, group]`` suffix, or empty when nothing to show.
 

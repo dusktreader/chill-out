@@ -69,6 +69,65 @@ both `main` and `dev` is included whenever either group is in
 `include_groups`.
 
 
+## Fix style
+
+When `--fix` rewrites a manifest, the `fix_style` setting controls the shape
+of the resulting requirement. Two styles are supported:
+
+| Value        | PyPI rendering                | npm rendering   | Future updates allowed              |
+|--------------|-------------------------------|-----------------|-------------------------------------|
+| `exact`      | `pkg==1.2.3`                  | `1.2.3`         | None; the version is pinned exactly. |
+| `compatible` | `pkg>={existing},<{M+1}.0.0`  | `^1.2.3`        | Any non-major release that satisfies the range. |
+
+The default is `exact`, which preserves the historical behavior: every fix
+produces a single concrete version. Pick `compatible` if you'd rather let
+your resolver pick up patch and minor updates automatically while still
+capping the next major behind another `chill-out` review.
+
+For PyPI, `compatible` style preserves any existing `>=` lower bound rather
+than collapsing it onto the safe version. A requirement like `rich>=14.0`
+violated by `rich 15.0.0` becomes `rich>=14.0,<15.0.0`, not
+`rich>=14.3.4,<15.0.0`. The original lower bound only gets bumped if it
+sits above the safe version, in which case `chill-out` falls back to the
+safe version as the floor.
+
+Two cases always render exact regardless of the configured style, because
+both exist specifically to dodge a known-bad version:
+
+- **Overrides.** A version listed in the `overrides` config block is, by
+  definition, a version you want pinned and nothing else.
+- **Principal rollbacks.** When a transitive violation is resolved by
+  rolling back a top-level dependency, both the principal pin and its
+  paired transitive pin are written exactly so a range can't drift the
+  resolver back into the original conflict.
+
+`fix_style` is supported in every config source. It also has a CLI flag
+(`--fix-style`) that takes priority over the resolved config:
+
+```yaml
+# .chill-out.yaml
+fix_style: compatible
+```
+
+```toml
+# pyproject.toml
+[tool.chill-out]
+fix_style = "compatible"
+```
+
+```json
+{
+  "chill-out": {
+    "fix_style": "compatible"
+  }
+}
+```
+
+```bash
+chill-out check --fix --fix-style compatible
+```
+
+
 ## Examples
 
 
