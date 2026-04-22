@@ -183,3 +183,49 @@ class TestRenderReport:
         assert "leaf" in out
         # Intermediate version comes from the installed index too.
         assert "0.5.0" in out
+
+    def test_shared_violation_annotates_strategy_with_member_owners(self) -> None:
+        # Tier 1: cross-member shared violations should be flagged in the strategy.
+        pkg = InstalledPackage(
+            name="lodash",
+            version="4.0.0",
+            ecosystem=EcosystemKind.NPM,
+            via_chain=("react",),
+            member_owners=("api", "backend"),
+        )
+        principal = InstalledPackage(name="react", version="18.0.0", ecosystem=EcosystemKind.NPM)
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=SafeVersion(version="3.9.0", age_days=300),
+        )
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM, checked=[pkg, principal], violations=[v]
+        )
+        out = _capture(render_report, report)
+        assert "shared" in out
+        assert "api" in out and "backend" in out
+        assert "overrides" in out
+
+    def test_unshared_violation_omits_shared_annotation(self) -> None:
+        pkg = InstalledPackage(
+            name="lodash",
+            version="4.0.0",
+            ecosystem=EcosystemKind.NPM,
+            member_owners=("api",),
+        )
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+            safe_version=SafeVersion(version="3.9.0", age_days=300),
+        )
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg], violations=[v])
+        out = _capture(render_report, report)
+        assert "shared" not in out
+        assert "overrides" not in out

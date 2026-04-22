@@ -551,3 +551,138 @@ class TestNpmRangeSatisfies:
             run.return_value.returncode = 2
             run.return_value.stderr = "no semver module"
             assert eco.range_satisfies("1.5.0", "^1.0.0") is True
+
+
+# ---------------------------------------------------------------------------
+# Workspace topology + member ownership (Tier 1)
+# ---------------------------------------------------------------------------
+
+
+def _make_workspace(tmp_path: Path, members: dict[str, list[str]]) -> Path:
+    """
+    Lay out a minimal npm workspace under ``tmp_path``.
+
+    ``members`` maps a member name to a list of (name, version) deps it
+    declares. Each member lives under ``packages/<short>``. Returns the
+    workspace root.
+    """
+    (tmp_path / "package.json").write_text(json.dumps({
+        "name": "ws-root",
+        "workspaces": ["packages/*"],
+    }))
+    (tmp_path / "package-lock.json").write_text("{}")
+    for member_name in members:
+        short = member_name.split("/")[-1]
+        member_dir = tmp_path / "packages" / short
+        member_dir.mkdir(parents=True)
+        (member_dir / "package.json").write_text(json.dumps({"name": member_name}))
+    return tmp_path
+
+
+class TestNpmWorkspaceTopology:
+    def test_returns_none_when_no_workspaces_field(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(json.dumps({"name": "single"}))
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco.workspace_topology() is None
+
+    def test_returns_none_when_no_lockfile_and_no_pkg(self, tmp_path: Path) -> None:
+        # No package.json at all
+        (tmp_path / "package-lock.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco.workspace_topology() is None
+
+    def test_array_form_workspaces(self, tmp_path: Path) -> None:
+        _make_workspace(tmp_path, {"api": [], "backend": [], "ui": []})
+        eco = NpmEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert topo.root == tmp_path
+        assert set(topo.members) == {"api", "backend", "ui"}
+
+    def test_object_form_workspaces(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(json.dumps({
+            "name": "ws-root",
+            "workspaces": {"packages": ["packages/*"]},
+        }))
+        (tmp_path / "package-lock.json").write_text("{}")
+        for name in ("api", "backend"):
+            d = tmp_path / "packages" / name
+            d.mkdir(parents=True)
+            (d / "package.json").write_text(json.dumps({"name": name}))
+        eco = NpmEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert set(topo.members) == {"api", "backend"}
+
+    def test_skips_unnamed_members(self, tmp_path: Path) -> None:
+        _make_workspace(tmp_path, {"api": []})
+        # Add an unnamed member
+        d = tmp_path / "packages" / "ghost"
+        d.mkdir()
+        (d / "package.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert set(topo.members) == {"api"}
+
+    def test_walks_up_from_member_to_workspace_root(self, tmp_path: Path) -> None:
+        _make_workspace(tmp_path, {"api": []})
+        # Run from inside the member directory
+        eco = NpmEcosystem(tmp_path / "packages" / "api")
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert topo.root == tmp_path
+
+
+class TestNpmComputeMemberOwnership:
+    def test_attributes_shared_dep_to_each_member(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        # Simulate npm list --all --json output where two members share lodash@4.0.0
+        root_data = {
+            "dependencies": {
+                "api": {
+                    "resolved": "file:packages/api",
+                    "dependencies": {
+                        "lodash": {"version": "4.0.0"},
+                        "axios": {"version": "1.0.0"},
+                    },
+                },
+                "backend": {
+                    "resolved": "file:packages/backend",
+                    "dependencies": {
+                        "lodash": {"version": "4.0.0"},
+                    },
+                },
+                "react": {  # registry-resolved, not a member
+                    "resolved": "https://registry.npmjs.org/react/-/react-18.0.0.tgz",
+                    "version": "18.0.0",
+                },
+            }
+        }
+        ownership = eco._compute_member_ownership(root_data)
+        assert ownership[("lodash", "4.0.0")] == {"api", "backend"}
+        assert ownership[("axios", "1.0.0")] == {"api"}
+        # react is not under a file: member; should not appear
+        assert ("react", "18.0.0") not in ownership
+
+    def test_returns_empty_for_non_workspace_tree(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        root_data = {
+            "dependencies": {
+                "react": {
+                    "resolved": "https://registry.npmjs.org/react/-/react-18.0.0.tgz",
+                    "version": "18.0.0",
+                },
+            }
+        }
+        assert eco._compute_member_ownership(root_data) == {}
+
+
+class TestNpmSupportsOverrides:
+    def test_returns_true(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text("{}")
+        eco = NpmEcosystem(tmp_path)
+        assert eco.supports_overrides() is True

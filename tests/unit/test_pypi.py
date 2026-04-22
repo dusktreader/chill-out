@@ -286,3 +286,208 @@ class TestPypiRangeSatisfies:
     def test_unparsable_specifier_falls_back_permissive(self, tmp_path: Path) -> None:
         eco = self._eco(tmp_path)
         assert eco.range_satisfies("1.0.0", "not a specifier") is True
+
+
+# ---------------------------------------------------------------------------
+# Workspace topology + override fixes (Tier 1 + Tier 2)
+# ---------------------------------------------------------------------------
+
+
+def _make_uv_workspace(tmp_path: Path, members: list[str]) -> Path:
+    """Lay out a minimal uv workspace; return the workspace root."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[project]\n"
+        "name = 'ws-root'\n"
+        "version = '0.1'\n"
+        "\n"
+        "[tool.uv.workspace]\n"
+        "members = ['packages/*']\n"
+    )
+    for name in members:
+        d = tmp_path / "packages" / name
+        d.mkdir(parents=True)
+        (d / "pyproject.toml").write_text(
+            f"[project]\nname = '{name}'\nversion = '0.1'\n"
+        )
+    return tmp_path
+
+
+class TestPypiWorkspaceTopology:
+    def test_returns_none_when_no_workspace_section(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'solo'\nversion = '0.1'\n")
+        eco = PypiEcosystem(tmp_path)
+        assert eco.workspace_topology() is None
+
+    def test_returns_none_when_no_pyproject(self, tmp_path: Path) -> None:
+        eco = PypiEcosystem(tmp_path)
+        assert eco.workspace_topology() is None
+
+    def test_discovers_members(self, tmp_path: Path) -> None:
+        _make_uv_workspace(tmp_path, ["api", "backend"])
+        eco = PypiEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert topo.root == tmp_path.resolve()
+        assert set(topo.members) == {"api", "backend"}
+
+    def test_normalizes_member_names(self, tmp_path: Path) -> None:
+        # PEP 503: My_Package -> my-package
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname = 'ws'\nversion = '0.1'\n"
+            "\n[tool.uv.workspace]\nmembers = ['packages/*']\n"
+        )
+        d = tmp_path / "packages" / "weird"
+        d.mkdir(parents=True)
+        (d / "pyproject.toml").write_text(
+            "[project]\nname = 'My_Package'\nversion = '0.1'\n"
+        )
+        eco = PypiEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert "my-package" in topo.members
+
+    def test_excludes_listed_dirs(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname = 'ws'\nversion = '0.1'\n"
+            "\n[tool.uv.workspace]\nmembers = ['packages/*']\nexclude = ['packages/legacy']\n"
+        )
+        for name in ("api", "legacy"):
+            d = tmp_path / "packages" / name
+            d.mkdir(parents=True)
+            (d / "pyproject.toml").write_text(
+                f"[project]\nname = '{name}'\nversion = '0.1'\n"
+            )
+        eco = PypiEcosystem(tmp_path)
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert set(topo.members) == {"api"}
+
+    def test_walks_up_from_member(self, tmp_path: Path) -> None:
+        _make_uv_workspace(tmp_path, ["api"])
+        eco = PypiEcosystem(tmp_path / "packages" / "api")
+        topo = eco.workspace_topology()
+        assert topo is not None
+        assert topo.root == tmp_path.resolve()
+
+
+class TestPypiSupportsOverrides:
+    def test_returns_true(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\nversion = '0.1'\n")
+        eco = PypiEcosystem(tmp_path)
+        assert eco.supports_overrides() is True
+
+
+class TestPypiApplyOverrideFixes:
+    def test_writes_override_dependencies_at_workspace_root(self, tmp_path: Path) -> None:
+        _make_uv_workspace(tmp_path, ["api"])
+        member = tmp_path / "packages" / "api"
+        eco = PypiEcosystem(member)
+        action = FixAction(
+            package="urllib3",
+            version="2.0.7",
+            via_overrides=True,
+        )
+        with patch("chill_out.ecosystems.pypi.subprocess.run") as run:
+            run.return_value.returncode = 0
+            run.return_value.stderr = ""
+            log = eco.apply_override_fixes([action])
+        assert log is not None
+        # Override should have been written to the workspace root, not the member
+        root_doc = (tmp_path / "pyproject.toml").read_text()
+        assert "override-dependencies" in root_doc
+        assert "urllib3==2.0.7" in root_doc
+        # Member's pyproject is untouched
+        member_doc = (member / "pyproject.toml").read_text()
+        assert "override-dependencies" not in member_doc
+        # Subprocess ran in the workspace root
+        run.assert_called_once()
+        assert run.call_args.kwargs["cwd"] == tmp_path.resolve()
+
+    def test_dedupes_existing_override_for_same_package(self, tmp_path: Path) -> None:
+        # Workspace root already has an override for urllib3
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname = 'ws'\nversion = '0.1'\n"
+            "\n[tool.uv.workspace]\nmembers = ['packages/*']\n"
+            "\n[tool.uv]\noverride-dependencies = ['urllib3==1.0.0', 'requests==2.0.0']\n"
+        )
+        d = tmp_path / "packages" / "api"
+        d.mkdir(parents=True)
+        (d / "pyproject.toml").write_text("[project]\nname = 'api'\nversion = '0.1'\n")
+        eco = PypiEcosystem(d)
+        action = FixAction(
+            package="urllib3",
+            version="2.0.7",
+            via_overrides=True,
+        )
+        with patch("chill_out.ecosystems.pypi.subprocess.run") as run:
+            run.return_value.returncode = 0
+            log = eco.apply_override_fixes([action])
+        assert log is not None
+        text = (tmp_path / "pyproject.toml").read_text()
+        # Old urllib3 entry should be gone, new one present, requests preserved
+        assert "urllib3==1.0.0" not in text
+        assert "urllib3==2.0.7" in text
+        assert "requests==2.0.0" in text
+
+    def test_returns_none_when_no_pyproject_at_root(self, tmp_path: Path) -> None:
+        # No pyproject.toml exists, so no workspace, and self.root has none either
+        eco = PypiEcosystem(tmp_path)
+        action = FixAction(
+            package="x",
+            version="1.0.0",
+            via_overrides=True,
+        )
+        assert eco.apply_override_fixes([action]) is None
+
+    def test_returns_empty_list_for_empty_actions(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\nversion = '0.1'\n")
+        eco = PypiEcosystem(tmp_path)
+        assert eco.apply_override_fixes([]) == []
+
+    def test_raises_when_uv_lock_fails(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\nversion = '0.1'\n")
+        eco = PypiEcosystem(tmp_path)
+        action = FixAction(
+            package="x",
+            version="1.0.0",
+            via_overrides=True,
+        )
+        with patch("chill_out.ecosystems.pypi.subprocess.run") as run:
+            run.return_value.returncode = 1
+            run.return_value.stderr = "resolution failed"
+            with pytest.raises(EcosystemError, match="resolution failed"):
+                eco.apply_override_fixes([action])
+
+
+class TestPypiApplyFixesRouting:
+    def test_routes_via_overrides_actions_to_apply_override_fixes(self, tmp_path: Path) -> None:
+        (tmp_path / "pyproject.toml").write_text(
+            "[project]\nname = 'x'\nversion = '0.1'\ndependencies = ['plain==1.0.0']\n"
+        )
+        eco = PypiEcosystem(tmp_path)
+        direct = FixAction(
+            package="plain",
+            version="1.5.0",
+            via_overrides=False,
+        )
+        override = FixAction(
+            package="urllib3",
+            version="2.0.7",
+            via_overrides=True,
+        )
+        with (
+            patch("chill_out.ecosystems.pypi.subprocess.run") as run,
+            patch.object(
+                PypiEcosystem,
+                "apply_override_fixes",
+                return_value=["overrode urllib3==2.0.7 (workspace root)"],
+            ) as override_mock,
+        ):
+            run.return_value.returncode = 0
+            run.return_value.stderr = ""
+            log = eco.apply_fixes([direct, override])
+        # Both code paths got their respective actions
+        override_mock.assert_called_once()
+        assert override_mock.call_args.args[0] == [override]
+        assert any("plain" in line for line in log)
+        assert any("urllib3" in line for line in log)

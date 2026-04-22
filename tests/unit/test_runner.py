@@ -521,3 +521,106 @@ class TestPlanFixesAsync:
         assert "principal" in by_name, f"expected principal rollback, got {plan.actions}"
         assert by_name["principal"].version == "1.5.0"
         assert by_name["child"].version == "1.9.0"
+
+
+class TestPlanFixesViaOverridesRouting:
+    """Tier 2: shared transitive violations should set FixAction.via_overrides."""
+
+    @pytest.mark.asyncio
+    async def test_shared_transitive_routes_through_overrides(
+        self, now: pendulum.DateTime, config
+    ) -> None:
+        from chill_out.models import CheckReport, SafeVersion, VersionManifest, Violation
+        from chill_out.runner import plan_fixes_async
+
+        # A transitive child shared by two workspace members
+        principal = InstalledPackage(name="parent", version="1.0.0", ecosystem=EcosystemKind.NPM)
+        child_pkg = InstalledPackage(
+            name="child",
+            version="2.0.0",
+            ecosystem=EcosystemKind.NPM,
+            via_chain=("parent",),
+            member_owners=("api", "backend"),
+        )
+        v = Violation(
+            package=child_pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.datetime(2025, 12, 30, tz="UTC"),
+            safe_version=SafeVersion("1.9.0", 100),
+        )
+        manifests = {
+            ("parent", "1.0.0"): VersionManifest("parent", "1.0.0", deps={"child": ">=1.0"}),
+        }
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM, checked=[child_pkg, principal], violations=[v]
+        )
+        eco = _FakeEcosystem(packages=[child_pkg, principal], data={}, manifests=manifests)
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].package == "child"
+        assert plan.actions[0].via_overrides is True
+
+    @pytest.mark.asyncio
+    async def test_unshared_transitive_stays_direct(
+        self, now: pendulum.DateTime, config
+    ) -> None:
+        from chill_out.models import CheckReport, SafeVersion, VersionManifest, Violation
+        from chill_out.runner import plan_fixes_async
+
+        principal = InstalledPackage(name="parent", version="1.0.0", ecosystem=EcosystemKind.NPM)
+        child_pkg = InstalledPackage(
+            name="child",
+            version="2.0.0",
+            ecosystem=EcosystemKind.NPM,
+            via_chain=("parent",),
+            member_owners=("api",),  # only one member
+        )
+        v = Violation(
+            package=child_pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.datetime(2025, 12, 30, tz="UTC"),
+            safe_version=SafeVersion("1.9.0", 100),
+        )
+        manifests = {
+            ("parent", "1.0.0"): VersionManifest("parent", "1.0.0", deps={"child": ">=1.0"}),
+        }
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM, checked=[child_pkg, principal], violations=[v]
+        )
+        eco = _FakeEcosystem(packages=[child_pkg, principal], data={}, manifests=manifests)
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].via_overrides is False
+
+    @pytest.mark.asyncio
+    async def test_shared_direct_violation_stays_direct(
+        self, now: pendulum.DateTime, config
+    ) -> None:
+        # Direct (non-via) violations don't go through overrides even if shared
+        # because they live in the project's own manifest.
+        from chill_out.models import CheckReport, SafeVersion, Violation
+        from chill_out.runner import plan_fixes_async
+
+        pkg = InstalledPackage(
+            name="requests",
+            version="2.31.0",
+            ecosystem=EcosystemKind.PYPI,
+            member_owners=("api", "backend"),
+        )
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.datetime(2025, 12, 30, tz="UTC"),
+            safe_version=SafeVersion("2.30.0", 100),
+        )
+        report = CheckReport(ecosystem=EcosystemKind.PYPI, checked=[pkg], violations=[v])
+        eco = _FakeEcosystem(packages=[pkg], data={}, manifests={})
+        plan = await plan_fixes_async(report, eco, config=config, now=now)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].via_overrides is False
