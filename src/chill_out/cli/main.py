@@ -68,6 +68,7 @@ def check(
     import asyncio
 
     import httpx
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn
 
     from chill_out.constants import DEFAULT_TIMEOUT
     from chill_out.models import CheckReport, FixPlan
@@ -85,15 +86,42 @@ def check(
 
     console.print(f"Checking [bold]{eco.kind.value}[/bold] project at [dim]{root}[/dim]")
 
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        console=console,
+        transient=True,
+    )
+    task_id: TaskID | None = None
+
+    def _on_start(packages: list) -> None:
+        nonlocal task_id
+        task_id = progress.add_task("Checking registry...", total=len(packages))
+
+    def _on_progress(_pkg) -> None:
+        if task_id is not None:
+            progress.advance(task_id)
+
     async def _run() -> tuple[CheckReport, FixPlan | None]:
         async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as http:
-            report = await check_async(eco, config=config, deep=deep, fast=fast, http=http)
+            report = await check_async(
+                eco,
+                config=config,
+                deep=deep,
+                fast=fast,
+                http=http,
+                on_start=_on_start,
+                on_progress=_on_progress,
+            )
             plan: FixPlan | None = None
             if fix and report.has_violations:
                 plan = await plan_fixes_async(report, eco, config=config, http=http)
             return report, plan
 
-    report, plan = asyncio.run(_run())
+    with progress:
+        report, plan = asyncio.run(_run())
     render_report(report, console, fast=fast)
 
     if fix and report.has_violations and plan is not None:

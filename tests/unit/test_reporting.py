@@ -66,8 +66,11 @@ class TestRenderReport:
         out = _capture(render_report, report, fast=True)
         assert "Suggested" not in out
 
-    def test_via_column_appears_when_transitive(self) -> None:
-        pkg = InstalledPackage(name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",))
+    def test_transitive_violation_renders_dep_tree(self) -> None:
+        principal = InstalledPackage(name="principal", version="1.0.0", ecosystem=EcosystemKind.NPM)
+        pkg = InstalledPackage(
+            name="t", version="2.0.0", ecosystem=EcosystemKind.NPM, via_chain=("principal",)
+        )
         v = Violation(
             package=pkg,
             release_type=ReleaseType.MAJOR,
@@ -75,6 +78,42 @@ class TestRenderReport:
             limit_days=30,
             published=pendulum.now("UTC"),
         )
-        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg], violations=[v])
+        report = CheckReport(ecosystem=EcosystemKind.NPM, checked=[pkg, principal], violations=[v])
         out = _capture(render_report, report)
+        # Principal sits above the violating leaf, with the leaf indented.
         assert "principal" in out
+        assert "1.0.0" in out  # principal version pulled from installed index
+        assert "t" in out
+        assert "2.0.0" in out
+        # The leaf annotation should call out the age vs limit explicitly.
+        assert "age 2d" in out
+        assert "30d" in out
+        # Tree connector glyph appears when there is a chain.
+        assert "└──" in out or "└── " in out
+
+    def test_multi_level_via_chain_renders_intermediate(self) -> None:
+        principal = InstalledPackage(name="principal", version="1.0.0", ecosystem=EcosystemKind.NPM)
+        intermediate = InstalledPackage(name="intermediate", version="0.5.0", ecosystem=EcosystemKind.NPM)
+        pkg = InstalledPackage(
+            name="leaf",
+            version="2.0.0",
+            ecosystem=EcosystemKind.NPM,
+            via_chain=("intermediate", "principal"),
+        )
+        v = Violation(
+            package=pkg,
+            release_type=ReleaseType.MAJOR,
+            age_days=2,
+            limit_days=30,
+            published=pendulum.now("UTC"),
+        )
+        report = CheckReport(
+            ecosystem=EcosystemKind.NPM, checked=[pkg, principal, intermediate], violations=[v]
+        )
+        out = _capture(render_report, report)
+        # All three names should appear in the tree.
+        assert "principal" in out
+        assert "intermediate" in out
+        assert "leaf" in out
+        # Intermediate version comes from the installed index too.
+        assert "0.5.0" in out

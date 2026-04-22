@@ -144,6 +144,49 @@ class TestCheckAsync:
         assert report.violations == []
         assert "no publish date" in report.skipped[0][1]
 
+    async def test_progress_callbacks_fire(self, now, config) -> None:
+        packages = [
+            InstalledPackage(name="a", version="1.0.0", ecosystem=EcosystemKind.NPM),
+            InstalledPackage(name="b", version="2.0.0", ecosystem=EcosystemKind.NPM),
+        ]
+        eco = _FakeEcosystem(
+            packages=packages,
+            data={
+                "a": PackageInfo(
+                    name="a",
+                    releases={"1.0.0": PackageRelease(version="1.0.0", published=now.subtract(days=200))},
+                ),
+                "b": PackageInfo(
+                    name="b",
+                    releases={"2.0.0": PackageRelease(version="2.0.0", published=now.subtract(days=200))},
+                ),
+            },
+        )
+        started: list[list[InstalledPackage]] = []
+        progressed: list[InstalledPackage] = []
+        await check_async(
+            eco,
+            config=config,
+            now=now,
+            on_start=started.append,
+            on_progress=progressed.append,
+        )
+        assert len(started) == 1
+        assert {p.name for p in started[0]} == {"a", "b"}
+        assert {p.name for p in progressed} == {"a", "b"}
+
+    async def test_progress_callback_fires_for_skipped_packages(self, now, config) -> None:
+        # The callback should fire even when the package is skipped (not found,
+        # no publish date, etc) so the progress bar always reaches 100%.
+        eco = _FakeEcosystem(
+            packages=[InstalledPackage(name="ghost", version="1.0.0", ecosystem=EcosystemKind.NPM)],
+            data={"ghost": None},
+        )
+        progressed: list[InstalledPackage] = []
+        await check_async(eco, config=config, now=now, on_progress=progressed.append)
+        assert len(progressed) == 1
+        assert progressed[0].name == "ghost"
+
 
 class TestPlanFixes:
     def test_principal_violation_becomes_dependency_pin(self, now, config) -> None:

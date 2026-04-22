@@ -8,7 +8,7 @@ Combines an :class:`Ecosystem` backend with the cooldown logic to produce a
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import httpx
@@ -41,6 +41,7 @@ async def _check_one(
     *,
     fast: bool,
     now: pendulum.DateTime,
+    on_complete: Callable[[InstalledPackage], None] | None = None,
 ) -> tuple[InstalledPackage, Violation | str | None]:
     """
     Fetch and evaluate a single package.
@@ -49,31 +50,39 @@ async def _check_one(
         ``(pkg, Violation)`` if the package is in cooldown,
         ``(pkg, "skip reason")`` if it could not be evaluated,
         ``(pkg, None)`` if it has cleared cooldown.
+
+    The ``on_complete`` callback fires once the package has been evaluated,
+    regardless of outcome. Useful for wiring up progress reporting without
+    coupling the runner to a particular UI library.
     """
     async with semaphore:
         try:
-            info = await client.fetch_package(pkg.name)
-        except RegistryError as exc:
-            logger.warning(f"Skipping {pkg.name}: {exc}")
-            return pkg, str(exc)
-        if info is None:
-            return pkg, "not found in registry"
-        published = info.published_at(pkg.version)
-        if published is None:
-            return pkg, f"no publish date for {pkg.version}"
-        rel_type = release_type(pkg.version)
-        violating, age_days, limit_days = is_within_cooldown(published, rel_type, config, now=now)
-        if not violating:
-            return pkg, None
-        safe = None if fast else find_safe_version(pkg.version, info, config, now=now)
-        return pkg, Violation(
-            package=pkg,
-            release_type=rel_type,
-            age_days=age_days,
-            limit_days=limit_days,
-            published=published,
-            safe_version=safe,
-        )
+            try:
+                info = await client.fetch_package(pkg.name)
+            except RegistryError as exc:
+                logger.warning(f"Skipping {pkg.name}: {exc}")
+                return pkg, str(exc)
+            if info is None:
+                return pkg, "not found in registry"
+            published = info.published_at(pkg.version)
+            if published is None:
+                return pkg, f"no publish date for {pkg.version}"
+            rel_type = release_type(pkg.version)
+            violating, age_days, limit_days = is_within_cooldown(published, rel_type, config, now=now)
+            if not violating:
+                return pkg, None
+            safe = None if fast else find_safe_version(pkg.version, info, config, now=now)
+            return pkg, Violation(
+                package=pkg,
+                release_type=rel_type,
+                age_days=age_days,
+                limit_days=limit_days,
+                published=published,
+                safe_version=safe,
+            )
+        finally:
+            if on_complete is not None:
+                on_complete(pkg)
 
 
 async def check_async(
@@ -85,6 +94,8 @@ async def check_async(
     concurrency: int = DEFAULT_CONCURRENCY,
     http: httpx.AsyncClient | None = None,
     now: pendulum.DateTime | None = None,
+    on_start: Callable[[list[InstalledPackage]], None] | None = None,
+    on_progress: Callable[[InstalledPackage], None] | None = None,
 ) -> CheckReport:
     """
     Run the full cooldown check for the given ecosystem.
@@ -98,10 +109,16 @@ async def check_async(
         concurrency: Maximum simultaneous registry requests.
         http: Optional pre-configured HTTP client (mostly useful for testing).
         now: Override the "now" timestamp used when comparing ages (testing).
+        on_start: Optional callback fired once with the full list of packages
+            about to be checked. Use it to size a progress bar.
+        on_progress: Optional callback fired once per package after it has
+            been evaluated. Use it to advance a progress bar.
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
     packages = ecosystem.load_installed(deep=deep)
+    if on_start is not None:
+        on_start(list(packages))
     semaphore = asyncio.Semaphore(concurrency)
 
     own_http = http is None
@@ -111,7 +128,10 @@ async def check_async(
     try:
         client = CachingRegistryClient(ecosystem.make_client(http))
         results = await asyncio.gather(
-            *(_check_one(pkg, client, config, semaphore, fast=fast, now=now) for pkg in packages)
+            *(
+                _check_one(pkg, client, config, semaphore, fast=fast, now=now, on_complete=on_progress)
+                for pkg in packages
+            )
         )
     finally:
         if own_http:

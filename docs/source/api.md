@@ -43,7 +43,23 @@ asyncio.run(main())
 ```
 
 `check_async` accepts an optional `httpx.AsyncClient` so you can share a
-connection pool with the rest of your application.
+connection pool with the rest of your application. It also accepts two
+callbacks for wiring up progress reporting without coupling to a particular
+UI library:
+
+```python
+report = await check_async(
+    eco,
+    on_start=lambda packages: print(f"checking {len(packages)} packages"),
+    on_progress=lambda pkg: print(f"  done: {pkg.name}"),
+)
+```
+
+`on_start` fires once with the full list of packages about to be checked.
+`on_progress` fires once per package after it has been evaluated, including
+packages that were skipped because the registry returned no data. The CLI
+uses these to drive a Rich progress bar; library callers can drive any UI
+that exposes "set total" and "advance" semantics.
 
 
 ## Planning fixes with conflict-aware rollback

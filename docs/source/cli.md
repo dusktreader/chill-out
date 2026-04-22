@@ -39,6 +39,27 @@ Exit codes:
 lookup that `--fast` skips). Everything else combines.
 
 
+### Output
+
+While registry calls are in flight, the CLI shows a spinner and an
+`M of N` progress bar so you can see how far along the check is. The
+spinner clears as soon as the check finishes.
+
+For each violation, the report prints the package, its release type, age,
+limit, and the suggested safe rollback target. Transitive violations are
+rendered as a dependency tree showing the principal at the root and the
+violating package at the leaf:
+
+```text
+fastapi 0.110.0
+└── starlette 0.36.3
+    └── anyio 4.3.0 (age 2d > 14d)
+```
+
+The intermediate node versions come from the project's lockfile, so the
+chain stays grounded in what is actually installed.
+
+
 ## `chill-out show-config`
 
 Prints the resolved cooldown thresholds without running a check. Useful when
