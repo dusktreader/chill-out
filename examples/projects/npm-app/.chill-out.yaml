@@ -1,0 +1,10 @@
+# chill-out cooldown configuration for the npm example project.
+#
+# Windows are deliberately generous so the demo surfaces violations no
+# matter when you run it. The same schema works under [tool.chill-out]
+# in a pyproject.toml or under cooldown: in a Dependabot config.
+cooldown:
+  default: 7
+  major: 30
+  minor: 14
+  patch: 7

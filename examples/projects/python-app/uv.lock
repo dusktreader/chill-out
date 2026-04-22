@@ -1,0 +1,50 @@
+version = 1
+
+[[package]]
+name = "fastapi"
+version = "0.110.0"
+[[package.dependencies]]
+name = "anyio"
+
+[[package.dependencies]]
+name = "starlette"
+
+[[package]]
+name = "starlette"
+version = "0.36.3"
+[[package.dependencies]]
+name = "anyio"
+
+[[package]]
+name = "anyio"
+version = "4.3.0"
+[[package.dependencies]]
+name = "sniffio"
+
+[[package]]
+name = "sniffio"
+version = "1.3.1"
+
+[[package]]
+name = "httpx"
+version = "0.27.0"
+[[package.dependencies]]
+name = "httpcore"
+
+[[package]]
+name = "httpcore"
+version = "1.0.4"
+
+[[package]]
+name = "rich"
+version = "13.7.1"
+[[package.dependencies]]
+name = "markdown-it-py"
+
+[[package]]
+name = "markdown-it-py"
+version = "3.0.0"
+
+[[package]]
+name = "pytest"
+version = "8.1.0"

@@ -150,7 +150,11 @@ chill-out/
 |-- tests/
 |   |-- unit/
 |   `-- integration/
-|-- examples/              # Runnable scripts demonstrating the API
+|-- examples/
+|   |-- *.py *.sh           # Per-API micro-templates
+|   `-- projects/           # Full example projects with manifests + lockfiles
+|       |-- npm-app/        # package.json + package-lock.json + .chill-out.yaml
+|       `-- python-app/     # pyproject.toml + uv.lock + .chill-out.yaml
 |-- docs/                  # Nested uv project for the zensical site
 |   |-- pyproject.toml
 |   |-- mkdocs.yaml

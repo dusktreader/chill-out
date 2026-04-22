@@ -39,6 +39,7 @@ nav:
   - Ecosystems: ecosystems.md
   - CLI: cli.md
   - Programmatic API: api.md
+  - Examples: examples.md
   - Reference: reference.md
 watch:
   - source/

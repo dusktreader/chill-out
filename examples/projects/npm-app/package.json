@@ -1,0 +1,14 @@
+{
+  "name": "chill-out-npm-example",
+  "version": "1.0.0",
+  "description": "An example npm project that chill-out can audit. Some declared deps land inside the cooldown window so the demo can show how the violations get resolved.",
+  "private": true,
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "express": "^4.19.2",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
