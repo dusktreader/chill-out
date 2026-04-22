@@ -112,3 +112,57 @@ class TestLayering:
         (tmp_path / ".chill-out.yaml").write_text("other: thing\n")
         cfg = load_config(tmp_path, EcosystemKind.NPM)
         assert cfg.for_release_type(ReleaseType.MAJOR) == DEFAULT_COOLDOWN_DAYS[ReleaseType.MAJOR]
+
+
+class TestPackageJsonSource:
+    def test_nested_cooldown_key_loads(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(
+            '{"name":"x","version":"1.0.0","chill-out":{"cooldown":{"major":21,"minor":5}}}'
+        )
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == 21
+        assert cfg.for_release_type(ReleaseType.MINOR) == 5
+
+    def test_flat_chill_out_key_loads(self, tmp_path: Path) -> None:
+        # The cooldown sub-key is optional; a flat map works too.
+        (tmp_path / "package.json").write_text(
+            '{"name":"x","version":"1.0.0","chill-out":{"major":15,"patch":2}}'
+        )
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == 15
+        assert cfg.for_release_type(ReleaseType.PATCH) == 2
+
+    def test_missing_chill_out_key_returns_defaults(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text('{"name":"x","version":"1.0.0"}')
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == DEFAULT_COOLDOWN_DAYS[ReleaseType.MAJOR]
+
+    def test_overrides_dependabot(self, tmp_path: Path) -> None:
+        gh = tmp_path / ".github"
+        gh.mkdir()
+        (gh / "dependabot.yml").write_text(
+            "updates:\n  - package-ecosystem: npm\n    cooldown:\n      semver-major-days: 99\n"
+        )
+        (tmp_path / "package.json").write_text(
+            '{"name":"x","version":"1.0.0","chill-out":{"cooldown":{"major":3}}}'
+        )
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == 3
+
+    def test_yaml_overrides_package_json(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(
+            '{"name":"x","version":"1.0.0","chill-out":{"cooldown":{"major":3}}}'
+        )
+        (tmp_path / ".chill-out.yaml").write_text("cooldown:\n  major: 1\n")
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == 1
+
+    def test_invalid_json_raises(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text('{"name": "x", broken')
+        with pytest.raises(ConfigError):
+            load_config(tmp_path, EcosystemKind.NPM)
+
+    def test_non_dict_chill_out_value_is_ignored(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text('{"name":"x","version":"1.0.0","chill-out":"oops"}')
+        cfg = load_config(tmp_path, EcosystemKind.NPM)
+        assert cfg.for_release_type(ReleaseType.MAJOR) == DEFAULT_COOLDOWN_DAYS[ReleaseType.MAJOR]

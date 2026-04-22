@@ -58,7 +58,9 @@ in the project root.
 Configuration is resolved by merging four sources, in decreasing precedence:
 
 1. `.chill-out.yaml` at the project root
-2. `[tool.chill-out]` in `pyproject.toml`
+2. The project's primary manifest: `[tool.chill-out]` in `pyproject.toml`
+   for Python projects, or the top-level `"chill-out"` key in `package.json`
+   for npm projects (the two slots sit at the same priority tier)
 3. The `cooldown` block from `.github/dependabot.yml`
 4. Built-in defaults (7 / 14 / 30 / 60 days)
 

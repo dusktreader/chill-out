@@ -8,9 +8,15 @@ defaults.
 | Priority | Source                                | Used for                                         |
 |----------|---------------------------------------|--------------------------------------------------|
 | 1        | `.chill-out.yaml` (or `.chill-out.yml`) | Project-wide override; checked in to the repo. |
-| 2        | `[tool.chill-out.cooldown]` in `pyproject.toml` | Same role, but reuses an existing TOML file. |
+| 2        | `[tool.chill-out.cooldown]` in `pyproject.toml`, or `"chill-out"` in `package.json` | Reuses the project's primary manifest. |
 | 3        | `.github/dependabot.yml` (matching ecosystem) | Reuses your Dependabot policy.            |
 | 4        | Built-in defaults                       | Sensible fallback if nothing else applies.       |
+
+The "primary manifest" tier picks whichever file the project already has. A
+Python project supplies the table in `pyproject.toml`; an npm project supplies
+it in `package.json`. The two slots sit at the same priority, so a project
+that somehow ships both will see the npm key win on a tie (`package.json` is
+loaded last among the manifest sources).
 
 
 ## Threshold values
@@ -57,6 +63,31 @@ minor = 14
 patch = 7
 default = 7
 ```
+
+
+### `package.json`
+
+The same idea works for npm projects: add a top-level `"chill-out"` key to
+`package.json`. The `cooldown` sub-key is optional, mirroring the yaml and
+pyproject shapes:
+
+```json
+{
+  "name": "my-app",
+  "version": "1.0.0",
+  "chill-out": {
+    "cooldown": {
+      "major": 60,
+      "minor": 14,
+      "patch": 7,
+      "default": 7
+    }
+  }
+}
+```
+
+A flat map under `"chill-out"` is also accepted, in case you find the nested
+key noisy for one-off configs.
 
 
 ### Dependabot reuse

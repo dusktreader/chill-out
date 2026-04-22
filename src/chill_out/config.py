@@ -4,7 +4,9 @@ Layered configuration loading for `chill-out`.
 Sources are consulted in priority order, highest first:
 
 1. A dedicated config file (``.chill-out.yaml`` or ``.chill-out.yml``) at the project root.
-2. A ``[tool.chill-out]`` table inside ``pyproject.toml``.
+2. The project's primary manifest:
+   - ``[tool.chill-out]`` in ``pyproject.toml`` (Python projects), or
+   - the top-level ``"chill-out"`` key in ``package.json`` (npm projects).
 3. The Dependabot ``cooldown:`` block for the matching ecosystem in ``.github/dependabot.yml``.
 4. Hard-coded defaults from ``chill_out.constants.DEFAULT_COOLDOWN_DAYS``.
 
@@ -14,6 +16,7 @@ remaining sources.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -104,6 +107,37 @@ def load_pyproject_table(root: Path) -> dict[ReleaseType, int]:
     return _coerce_days(dict(cooldown))
 
 
+def load_package_json(root: Path) -> dict[ReleaseType, int]:
+    """
+    Load thresholds from a top-level ``"chill-out"`` key in ``package.json``.
+
+    The key may either contain a flat day map, or wrap it in a ``"cooldown"``
+    sub-key to mirror the pyproject and yaml shapes:
+
+    .. code-block:: json
+
+        {
+          "chill-out": {
+            "cooldown": {"major": 30, "minor": 14, "patch": 7, "default": 7}
+          }
+        }
+    """
+    path = root / "package.json"
+    if not path.is_file():
+        return {}
+    try:
+        doc = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ConfigError(f"Failed to parse {path}: {exc}") from exc
+    block = doc.get("chill-out") if isinstance(doc, dict) else None
+    if not isinstance(block, dict):
+        return {}
+    cooldown = block.get("cooldown", block)
+    if not isinstance(cooldown, dict):
+        return {}
+    return _coerce_days(cooldown)
+
+
 def load_dependabot(root: Path, ecosystem: EcosystemKind) -> dict[ReleaseType, int]:
     """Load thresholds from ``.github/dependabot.yml`` for the matching ecosystem."""
     path = root / ".github" / "dependabot.yml"
@@ -135,6 +169,7 @@ def load_config(root: Path, ecosystem: EcosystemKind) -> CooldownConfig:
         dict(DEFAULT_COOLDOWN_DAYS),
         load_dependabot(root, ecosystem),
         load_pyproject_table(root),
+        load_package_json(root),
         load_chill_out_yaml(root),
     ]
     merged: dict[ReleaseType, int] = {}
