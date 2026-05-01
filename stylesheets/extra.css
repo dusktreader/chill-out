@@ -1,0 +1,74 @@
+/* Chill Hero palette — sourced from docs/source/images/chill-hero.png
+ *
+ * Core hues:
+ *   #1a2838  deep navy (sunglasses, shadows)
+ *   #1e4a6f  ocean blue (character body)
+ *   #5fb3d4  bright cyan (highlights, sky)
+ *   #a8d8e8  soft sky blue
+ *   #e8d4a8  warm sand
+ *   #d4b87a  deep sand
+ *   #4a7a4a  palm green
+ */
+
+/* Chill dark — warm graphite: neutral dark surface with cyan and sand-gold accents */
+[data-md-color-scheme="slate"] {
+    --md-hue: 30;
+
+    --md-primary-fg-color:             #7fc8e0;
+    --md-primary-fg-color--light:      #b8e0ec;
+    --md-primary-fg-color--dark:       #1e4a6f;
+    --md-primary-bg-color:             #2a2724;
+    --md-primary-bg-color--light:      #3a3633;
+
+    --md-accent-fg-color:              #e8c878;
+    --md-accent-fg-color--transparent: #e8c87826;
+    --md-accent-bg-color:              #2a2724;
+
+    --md-default-bg-color:             #2a2724;
+    --md-default-bg-color--light:      #3a3633;
+    --md-default-bg-color--lighter:    #4a4642;
+    --md-default-bg-color--lightest:   #5a5550;
+
+    --md-default-fg-color:             #f0ece4;
+    --md-default-fg-color--light:      #c8c2b8;
+    --md-default-fg-color--lighter:    #88837c;
+    --md-default-fg-color--lightest:   #524e48;
+
+    --md-code-bg-color:                #1f1d1a;
+    --md-code-fg-color:                #b8e0ec;
+}
+
+/* Chill light — warm sand with ocean-blue ink */
+[data-md-color-scheme="default"] {
+    --md-primary-fg-color:             #1e4a6f;
+    --md-primary-fg-color--light:      #5fb3d4;
+    --md-primary-fg-color--dark:       #1a2838;
+    --md-primary-bg-color:             #f5ead0;
+    --md-primary-bg-color--light:      #e8d4a8;
+
+    --md-accent-fg-color:              #4a7a4a;
+    --md-accent-fg-color--transparent: #4a7a4a20;
+    --md-accent-bg-color:              #f5ead0;
+
+    --md-default-bg-color:             #f5ead0;
+    --md-default-bg-color--light:      #e8d4a8;
+    --md-default-bg-color--lighter:    #d4b87a;
+    --md-default-bg-color--lightest:   #a8d8e8;
+
+    --md-default-fg-color:             #1a2838;
+    --md-default-fg-color--light:      #1e4a6f;
+    --md-default-fg-color--lighter:    #4a6a85;
+    --md-default-fg-color--lightest:   #a8b8c8;
+
+    --md-code-bg-color:                #ebdcb4;
+    --md-code-fg-color:                #1a2838;
+}
+
+/* Nav section headings — primary color, uppercase, to distinguish from items */
+.md-nav__item--section > .md-nav__link {
+    color: var(--md-primary-fg-color);
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}

@@ -1,0 +1,1117 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://dusktreader.github.io/chill-out/api/">
+      
+      
+        <link rel="prev" href="../cli/">
+      
+      
+        <link rel="next" href="../github-actions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../images/chill.png">
+      <meta name="generator" content="zensical-0.0.38">
+    
+    
+      
+        <title>Programmatic API - chill-out documentation</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.1e981d71.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CFira+Code:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"Fira Code"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#programmatic-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="chill-out documentation" class="md-header__button md-logo" aria-label="chill-out documentation" data-md-component="logo">
+      
+  <img src="../images/chill.png" alt="chill-out documentation">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            chill-out documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Programmatic API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/dusktreader/chill-out" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="chill-out documentation" class="md-nav__button md-logo" aria-label="chill-out documentation" data-md-component="logo">
+      
+  <img src="../images/chill.png" alt="chill-out documentation">
+
+    </a>
+    chill-out documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/dusktreader/chill-out" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state-file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../case-study/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case study
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-it-works/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-simplest-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The simplest call
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#async-with-full-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Async with full control
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-fix-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choosing a fix style
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#planning-fixes-with-conflict-aware-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Planning fixes with conflict-aware rollback
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-a-report-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Building a report manually
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catching-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Catching errors
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Examples directory
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next stops
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-simplest-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The simplest call
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#async-with-full-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Async with full control
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-fix-style" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choosing a fix style
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#planning-fixes-with-conflict-aware-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Planning fixes with conflict-aware rollback
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#building-a-report-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Building a report manually
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catching-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Catching errors
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Examples directory
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next stops
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="programmatic-api">Programmatic API</h1>
+<p>Every CLI feature is also a regular Python function. If your build tooling is already in Python, calling <code>chill-out</code>
+directly is faster, lets you hold onto the structured report, and skips spawning a subprocess.</p>
+<h2 id="the-simplest-call">The simplest call</h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">check</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">report</span> <span class="o">=</span> <span class="n">check</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">has_violations</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">violations</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">v</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">==</span><span class="si">{</span><span class="n">v</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2"> rel_type=</span><span class="si">{</span><span class="n">v</span><span class="o">.</span><span class="n">release_type</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>check</code> is the synchronous wrapper around <code>check_async</code>. It auto-detects the ecosystem from the given root.</p>
+<h2 id="async-with-full-control">Async with full control</h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">PypiEcosystem</span><span class="p">,</span> <span class="n">check_async</span><span class="p">,</span> <span class="n">plan_fixes</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">eco</span> <span class="o">=</span> <span class="n">PypiEcosystem</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">report</span> <span class="o">=</span> <span class="k">await</span> <span class="n">check_async</span><span class="p">(</span><span class="n">eco</span><span class="p">,</span> <span class="n">fast</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">plan</span> <span class="o">=</span> <span class="n">plan_fixes</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">actions</span><span class="p">:</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pin </span><span class="si">{</span><span class="n">action</span><span class="o">.</span><span class="n">package</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">action</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">unfixable</span><span class="p">:</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unfixable </span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">violation</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">==</span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">violation</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</span></code></pre></div>
+<p><code>check_async</code> accepts an optional <code>httpx.AsyncClient</code> so you can share a connection pool with the rest of your
+application. It also accepts two callbacks for wiring up progress reporting without coupling to a particular UI library:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">report</span> <span class="o">=</span> <span class="k">await</span> <span class="n">check_async</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">eco</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">on_start</span><span class="o">=</span><span class="k">lambda</span> <span class="n">packages</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;checking </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">packages</span><span class="p">)</span><span class="si">}</span><span class="s2"> packages&quot;</span><span class="p">),</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">pkg</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  done: </span><span class="si">{</span><span class="n">pkg</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>on_start</code> fires once with the full list of packages about to be checked. <code>on_progress</code> fires once per package after it
+has been evaluated, including packages that were skipped because the registry returned no data. The CLI uses these to
+drive a Rich progress bar; library callers can drive any UI that exposes "set total" and "advance" semantics.</p>
+<h2 id="choosing-a-fix-style">Choosing a fix style</h2>
+<p><code>plan_fixes</code> accepts a <code>fix_style</code> keyword that controls the shape of each emitted pin. The default is <code>FixStyle.EXACT</code>,
+which mirrors what the CLI does without <code>--fix-style</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">FixStyle</span><span class="p">,</span> <span class="n">plan_fixes</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">plan</span> <span class="o">=</span> <span class="n">plan_fixes</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">fix_style</span><span class="o">=</span><span class="n">FixStyle</span><span class="o">.</span><span class="n">COMPATIBLE</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">actions</span><span class="p">:</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">package</span><span class="p">,</span> <span class="n">action</span><span class="o">.</span><span class="n">style</span><span class="p">,</span> <span class="n">action</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>plan_fixes_async</code> reads the style from <code>config.fix_style</code> instead of taking it as a kwarg, since it already takes a
+full <code>ChillOutConfig</code>. Pass a config with the field set:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_config</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">load_config</span><span class="p">(</span><span class="n">eco</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">eco</span><span class="o">.</span><span class="n">kind</span><span class="p">)</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;fix_style&quot;</span><span class="p">:</span> <span class="n">FixStyle</span><span class="o">.</span><span class="n">COMPATIBLE</span><span class="p">})</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">plan</span> <span class="o">=</span> <span class="k">await</span> <span class="n">plan_fixes_async</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">eco</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span> <span class="n">http</span><span class="o">=</span><span class="n">http</span><span class="p">)</span>
+</span></code></pre></div>
+<p>In both forms, override-bound and principal-rollback actions stay exact regardless of the requested style. The <code>style</code>
+field on each <code>FixAction</code> records what actually got written.</p>
+<h2 id="planning-fixes-with-conflict-aware-rollback">Planning fixes with conflict-aware rollback</h2>
+<p><code>plan_fixes(report)</code> returns a <code>FixPlan</code> with a flat list of direct pins and a list of <code>UnfixableViolation</code> entries.
+Both lists may be empty.</p>
+<p>For transitive violations the synchronous form just emits a direct pin and trusts the resolver to hoist it. That works
+for npm, but pip and uv refuse to resolve a pin that falls outside the principal's declared range. The async form
+<code>plan_fixes_async</code> handles those cases by walking older principal versions for one whose declared range <em>does</em> admit the
+safe transitive, and emitting both a principal rollback and the transitive pin. When no compatible older principal
+exists, the violation lands in <code>FixPlan.unfixable</code> with a structured reason that lists the maintainer's options.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">PypiEcosystem</span><span class="p">,</span> <span class="n">check_async</span><span class="p">,</span> <span class="n">plan_fixes_async</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">eco</span> <span class="o">=</span> <span class="n">PypiEcosystem</span><span class="p">(</span><span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">())</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">http</span><span class="p">:</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="n">report</span> <span class="o">=</span> <span class="k">await</span> <span class="n">check_async</span><span class="p">(</span><span class="n">eco</span><span class="p">,</span> <span class="n">http</span><span class="o">=</span><span class="n">http</span><span class="p">)</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="n">plan</span> <span class="o">=</span> <span class="k">await</span> <span class="n">plan_fixes_async</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">eco</span><span class="p">,</span> <span class="n">http</span><span class="o">=</span><span class="n">http</span><span class="p">)</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="k">for</span> <span class="n">action</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">actions</span><span class="p">:</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;pin </span><span class="si">{</span><span class="n">action</span><span class="o">.</span><span class="n">package</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">action</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">unfixable</span><span class="p">:</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  ! </span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">violation</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">==</span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">violation</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">main</span><span class="p">())</span>
+</span></code></pre></div>
+<p>Sharing the <code>httpx.AsyncClient</code> between <code>check_async</code> and <code>plan_fixes_async</code> means the registry cache built up during
+the check is reused during planning.</p>
+<h2 id="building-a-report-manually">Building a report manually</h2>
+<p>The cooldown engine in <code>chill_out.cooldown</code> is a handful of pure functions sitting on top of <code>ChillOutConfig</code>. Reach
+for them when your release data already lives somewhere other than a public registry: an internal mirror, an SBOM, a
+cached database row. They're not re-exported from the top-level <code>chill_out</code> namespace because they only make sense
+paired with a version parser, and the parser depends on which ecosystem you're modeling.</p>
+<p>A parser is just a callable that turns a version string into a <code>ParsedVersion</code> (or <code>None</code> for inputs the ecosystem
+can't classify). Each ecosystem ships one as a method on its class, so the easy path is to instantiate the ecosystem
+you want and grab its <code>parse_version</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pendulum</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChillOutConfig</span><span class="p">,</span> <span class="n">NpmEcosystem</span><span class="p">,</span> <span class="n">PackageInfo</span><span class="p">,</span> <span class="n">PackageRelease</span><span class="p">,</span> <span class="n">ReleaseType</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">chill_out.cooldown</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_safe_version</span><span class="p">,</span> <span class="n">is_within_cooldown</span><span class="p">,</span> <span class="n">release_type</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># Use whichever ecosystem matches the version flavor of your data. The root</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># argument doesn&#39;t have to point at a real project; the parser is pure.</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">parser</span> <span class="o">=</span> <span class="n">NpmEcosystem</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">parse_version</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="n">now</span> <span class="o">=</span> <span class="n">pendulum</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="s2">&quot;UTC&quot;</span><span class="p">)</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="n">info</span> <span class="o">=</span> <span class="n">PackageInfo</span><span class="p">(</span>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;example&quot;</span><span class="p">,</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    <span class="n">releases</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>        <span class="s2">&quot;2.0.0&quot;</span><span class="p">:</span> <span class="n">PackageRelease</span><span class="p">(</span><span class="s2">&quot;2.0.0&quot;</span><span class="p">,</span> <span class="n">now</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)),</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>        <span class="s2">&quot;1.5.0&quot;</span><span class="p">:</span> <span class="n">PackageRelease</span><span class="p">(</span><span class="s2">&quot;1.5.0&quot;</span><span class="p">,</span> <span class="n">now</span><span class="o">.</span><span class="n">subtract</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">60</span><span class="p">)),</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="p">},</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="p">)</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="n">config</span> <span class="o">=</span> <span class="n">ChillOutConfig</span><span class="p">(</span><span class="n">cooldown_days</span><span class="o">=</span><span class="p">{</span><span class="n">ReleaseType</span><span class="o">.</span><span class="n">MAJOR</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span> <span class="n">ReleaseType</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">:</span> <span class="mi">5</span><span class="p">})</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="n">rel_type</span> <span class="o">=</span> <span class="n">release_type</span><span class="p">(</span><span class="s2">&quot;2.0.0&quot;</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="n">violating</span><span class="p">,</span> <span class="n">age</span><span class="p">,</span> <span class="n">limit</span> <span class="o">=</span> <span class="n">is_within_cooldown</span><span class="p">(</span><span class="n">info</span><span class="o">.</span><span class="n">published_at</span><span class="p">(</span><span class="s2">&quot;2.0.0&quot;</span><span class="p">),</span> <span class="n">rel_type</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="n">safe</span> <span class="o">=</span> <span class="n">find_safe_version</span><span class="p">(</span><span class="s2">&quot;2.0.0&quot;</span><span class="p">,</span> <span class="n">info</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">parser</span><span class="p">)</span>
+</span></code></pre></div>
+<p>For Python data, swap in <code>PypiEcosystem(...).parse_version</code>. The two parsers obey their own ecosystems' rules: npm's
+parser is strict semver, while pypi's understands PEP 440 (epochs, post-releases, the works) so two-segment versions
+like <code>idna 3.12</code> classify the way users actually expect.</p>
+<h2 id="catching-errors">Catching errors</h2>
+<p>Every <code>chill-out</code>-raised error inherits from <code>ChillOutError</code>. The hierarchy:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>ChillOutError
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>├── ConfigError       — bad cooldown config
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>├── EcosystemError    — detection or manifest problem
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>├── RegistryError     — registry call failed
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>├── StateError        — state file corrupt, unreadable, or written under an unknown schema
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>└── CooldownViolation — raised by tooling that wants to short-circuit on violation
+</span></code></pre></div>
+<p><code>StateError</code> has four concrete subclasses (<code>StateFileUnreadableError</code>, <code>StateFileCorruptError</code>,
+<code>StateSchemaVersionError</code>, <code>StateValidationError</code>), each pointing at a different failure mode of <code>.chill-out-state.json</code>.
+They all live in <code>chill_out.state</code> and re-export from the top-level <code>chill_out</code> namespace.</p>
+<p>Each subclass carries its own default <code>ExitCode</code>, which the CLI uses to choose its exit status. Library code rarely
+needs that field, but it's there.</p>
+<h2 id="examples-directory">Examples directory</h2>
+<p>The <code>examples/</code> folder ships short scripts demonstrating each entry point:</p>
+<ul>
+<li><code>programmatic_pypi.py</code> — full PyPI check</li>
+<li><code>programmatic_npm.py</code> — full npm check</li>
+<li><code>custom_config.py</code> — passing a hand-built <code>ChillOutConfig</code></li>
+<li><code>inspect_safe_versions.py</code> — pure helpers, no network</li>
+<li><code>cli_check.sh</code> — shell-side equivalent of the simplest call</li>
+</ul>
+<h2 id="next-stops">Next stops</h2>
+<ul>
+<li><a href="../reference/">Reference</a> for the full auto-generated API documentation</li>
+<li><a href="../configuration/">Configuration</a> for the schema behind <code>ChillOutConfig</code></li>
+<li><a href="../examples/">Examples</a> for narrated walk-throughs of the scripts listed above</li>
+<li><a href="../cli/">CLI</a> for the command-line surface that wraps this same API</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../cli/" class="md-footer__link md-footer__link--prev" aria-label="Previous: CLI">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                CLI
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../github-actions/" class="md-footer__link md-footer__link--next" aria-label="Next: GitHub Actions">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                GitHub Actions
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.expand","navigation.footer","navigation.tracking","content.code.copy"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.dbc0afdc.min.js"></script>
+      
+    
+  </body>
+</html>

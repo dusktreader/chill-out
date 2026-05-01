@@ -1,0 +1,1409 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://dusktreader.github.io/chill-out/how-it-works/">
+      
+      
+        <link rel="prev" href="../case-study/">
+      
+      
+        <link rel="next" href="../cli/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../images/chill.png">
+      <meta name="generator" content="zensical-0.0.38">
+    
+    
+      
+        <title>How it works - chill-out documentation</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.1e981d71.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CFira+Code:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"Fira Code"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,a=__md_scope)=>JSON.parse(t.getItem(a.pathname+"."+e)),__md_set=(e,t,a=localStorage,_=__md_scope)=>{try{a.setItem(_.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-it-works" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="chill-out documentation" class="md-header__button md-logo" aria-label="chill-out documentation" data-md-component="logo">
+      
+  <img src="../images/chill.png" alt="chill-out documentation">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            chill-out documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How it works
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/dusktreader/chill-out" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="chill-out documentation" class="md-nav__button md-logo" aria-label="chill-out documentation" data-md-component="logo">
+      
+  <img src="../images/chill.png" alt="chill-out documentation">
+
+    </a>
+    chill-out documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/dusktreader/chill-out" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../state-file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecosystems/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ecosystems
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../case-study/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Case study
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How it works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-pipeline-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The pipeline at a glance
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detecting-the-ecosystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detecting the ecosystem
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-lockfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Reading the lockfile
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asking-the-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Asking the registry
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asking the registry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#request-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Request deduplication
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#classifying-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Classifying releases
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ecosystem-owned-version-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ecosystem-owned version parsing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#picking-a-safe-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Picking a safe version
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transitive-violations-and-the-dependency-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transitive violations and the dependency tree
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conflict-aware-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Conflict-aware rollback
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#override-fallback-npm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Override fallback (npm)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-these-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why these choices
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Why these choices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lockfile-end-to-end-always" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Lockfile end-to-end, always
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-ecosystem-release-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Per-ecosystem release classification
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-pins-by-default-for-fix_style" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exact pins by default for <code>fix_style</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-memory-cache-not-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        In-memory cache, not on-disk
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-global-wall-clock-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        No global wall-clock cap
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next stops
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Programmatic API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../github-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub Actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-pipeline-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The pipeline at a glance
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detecting-the-ecosystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detecting the ecosystem
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reading-the-lockfile" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Reading the lockfile
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asking-the-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Asking the registry
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Asking the registry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#request-deduplication" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Request deduplication
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#classifying-releases" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Classifying releases
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ecosystem-owned-version-parsing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ecosystem-owned version parsing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#picking-a-safe-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Picking a safe version
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#transitive-violations-and-the-dependency-tree" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Transitive violations and the dependency tree
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#conflict-aware-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Conflict-aware rollback
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#override-fallback-npm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Override fallback (npm)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-these-choices" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why these choices
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Why these choices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lockfile-end-to-end-always" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Lockfile end-to-end, always
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-ecosystem-release-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Per-ecosystem release classification
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exact-pins-by-default-for-fix_style" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Exact pins by default for <code>fix_style</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-memory-cache-not-on-disk" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        In-memory cache, not on-disk
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-global-wall-clock-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        No global wall-clock cap
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-stops" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next stops
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="how-it-works">How it works</h1>
+<p><code>chill-out</code> is a small pipeline glued together from a handful of independent pieces, each of which you can read in
+isolation. This page walks through what happens between <code>chill-out check</code> and the report it prints, so you know what
+to expect, where to look when something goes sideways, and how to extend it if you want to.</p>
+<h2 id="the-pipeline-at-a-glance">The pipeline at a glance</h2>
+<p>Every run, whether <code>check</code> or <code>fix</code>, follows the same four phases:</p>
+<ol>
+<li><strong>Detect</strong> the ecosystem (npm or pypi) by looking for telltale files in the project root.</li>
+<li><strong>Load</strong> every installed package from the lockfile: principals and transitives together.</li>
+<li><strong>Ask the registry</strong> when each version was published and how it relates to other releases of the same package.</li>
+<li><strong>Evaluate</strong> each release against the configured cooldown windows and assemble a report.</li>
+</ol>
+<p><code>fix</code> adds a fifth phase: turn the report's violations into a list of <code>FixAction</code>s, write them to disk, and re-run the
+check to confirm the resolver actually picked up the new pins.</p>
+<p>Each phase lives in its own module. The high-level orchestration is in <code>chill_out.runner</code>; the cooldown math is in
+<code>chill_out.cooldown</code>; the per-ecosystem details are in <code>chill_out.ecosystems.npm</code> and <code>chill_out.ecosystems.pypi</code>. None
+of the phases know more than they need to about the others, which makes the pipeline easy to reason about and easy to
+add a third ecosystem to.</p>
+<h2 id="detecting-the-ecosystem">Detecting the ecosystem</h2>
+<p><code>detect_ecosystem(root)</code> looks for the marker files each backend declares. For npm that's <code>package.json</code>; for pypi
+that's <code>pyproject.toml</code>. The first ecosystem that says "yes, that's me" wins. If you have both (a Python project that
+also bundles a JS frontend), pass <code>--ecosystem</code> to force the choice; otherwise detection picks whichever shows up first
+in the registry.</p>
+<p>The <code>Ecosystem</code> Protocol in <code>chill_out.ecosystems.backend</code> defines the contract every backend honors:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Ecosystem</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">kind</span><span class="p">:</span> <span class="n">EcosystemKind</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">root</span><span class="p">:</span> <span class="n">Path</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">load_installed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">InstalledPackage</span><span class="p">]:</span> <span class="o">...</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch_package</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">http</span><span class="p">:</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackageInfo</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch_version_manifest</span><span class="p">(</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">http</span><span class="p">:</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">VersionManifest</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">apply_fixes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actions</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">FixAction</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span> <span class="o">...</span>
+</span></code></pre></div>
+<p>Detection of which backend applies to a given project root lives on a separate <code>EcosystemDetector</code> Protocol so the
+registry can probe candidates without constructing a backend instance up front:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">EcosystemDetector</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">detect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span> <span class="o">...</span>
+</span></code></pre></div>
+<p>That's the whole interface. Adding a third ecosystem (cargo, gem, hex, whatever) is a matter of writing a class that
+satisfies these protocols (no inheritance required) and registering it. The runner doesn't care which one it's
+holding.</p>
+<h2 id="reading-the-lockfile">Reading the lockfile</h2>
+<p>Each backend reads the project's lockfile and produces a flat list of <code>InstalledPackage</code> records: <code>(name, version,
+ecosystem)</code>. The npm backend shells out to <code>npm list --json</code> (which reads <code>package-lock.json</code> under the hood); the pypi
+backend parses <code>uv.lock</code> directly.</p>
+<p>Every package in the lockfile makes it into that list. The lockfile is what actually gets installed, so auditing any
+subset of it would be lying about the threat surface. A <code>requests</code> declared in <code>pyproject.toml</code> matters only insofar
+as it shows up in <code>uv.lock</code>, and a transitive nobody declared shows up in the lockfile all the same, ready to run code
+in your environment like any other dependency. Supply chain attacks surface as brand-new releases of some package,
+somewhere in that tree. That's why "the lockfile end-to-end" is the right unit to audit.</p>
+<p><code>uv.lock</code> is required for the pypi backend. If it's missing, the backend raises an ecosystem error asking you to run
+<code>uv lock</code> first rather than guessing at what would be resolved. The old fallback to pinned specs in <code>pyproject.toml</code> is
+gone: it was answering a different question than the one a cooldown audit actually asks.</p>
+<p>The distinction between "principal" and "transitive" is still meaningful, but it matters for fix planning rather than
+for the audit. A principal is a package you declared directly; a transitive is pulled in by something else. We need to
+know which is which so we can pin to the right file when fixing (and so the dependency tree rendered for transitive
+violations points at the right principal at the top of the chain).</p>
+<h2 id="asking-the-registry">Asking the registry</h2>
+<p><code>check_async</code> builds a <code>RegistryClient</code> for the detected ecosystem and fans out one async request per package, gated by
+a semaphore so a project with 200 dependencies doesn't open 200 simultaneous sockets. The default concurrency is high
+enough to keep wall-clock time short on a typical project but low enough to play nicely with rate-limited registries.</p>
+<p>Each response gets normalized into a <code>PackageInfo</code>: a dict of every published version mapped to its publish timestamp.
+That's the only piece of registry data the cooldown engine needs. Any other metadata the registry hands back (downloads,
+licenses, deprecation flags) is dropped on the floor; the pipeline stays narrow on purpose.</p>
+<h3 id="request-deduplication">Request deduplication</h3>
+<p><code>RegistryClient</code> wraps an <code>Ecosystem</code>'s registry methods with an in-memory dedupe layer. Within a single run, the
+first lookup for a given package (or a given <code>(package, version)</code> manifest) hits the network; every subsequent lookup
+for the same key returns the stored result without another round trip. Concurrent callers asking for the same key while
+a fetch is still in flight share that one fetch instead of racing duplicate requests.</p>
+<p>The cache lives for the lifetime of the process and nothing more. There's no on-disk store and no cross-run
+persistence: each invocation starts empty and warms up as it goes. That keeps the pipeline stateless from the user's
+perspective (no cache directory to manage, no staleness to worry about) while still saving real work inside a single
+run, since the same transitive package often gets reached through several chains in a wide graph.</p>
+<h2 id="classifying-releases">Classifying releases</h2>
+<p>For each installed version, <code>release_type</code> (in <code>chill_out.cooldown</code>) categorizes it as <code>MAJOR</code>, <code>MINOR</code>, or <code>PATCH</code>
+based on its position in the release sequence:</p>
+<ul>
+<li><code>1.0.0</code> -&gt; major (everything to the right is zero)</li>
+<li><code>1.4.0</code> -&gt; minor (patch is zero, minor is not)</li>
+<li><code>1.4.7</code> -&gt; patch (everything else)</li>
+</ul>
+<p><code>release_type</code> doesn't parse the version itself. It takes a <code>VersionParser</code> callable supplied by the active ecosystem
+(see <a href="#ecosystem-owned-version-parsing">Ecosystem-owned version parsing</a> below) and works against the resulting
+<code>ParsedVersion</code>. Anything the parser rejects (date-based versions, vendor suffixes, anything too creative) falls back
+to a <code>DEFAULT</code> release type with its own configurable threshold. The classification is intentionally simple:
+chill-out doesn't try to divine intent from changelogs or tags, just from the version number itself.</p>
+<p><code>is_within_cooldown</code> then compares the publish timestamp to the configured threshold for that release type. If the
+release is younger than its threshold, it's a violation; otherwise it's clear.</p>
+<h2 id="ecosystem-owned-version-parsing">Ecosystem-owned version parsing</h2>
+<p>Version strings look superficially uniform across ecosystems but they aren't. npm enforces strict three-segment semver
+and treats anything else as invalid. PyPI follows PEP 440, which permits two-segment releases (<code>idna 3.12</code>), epochs
+(<code>1!2.0</code>), post-releases (<code>1.0.post1</code>), and a long tail of things semver would reject outright. Trying to share one
+parser between the two would force the engine to either pick a least-common-denominator (and silently misclassify
+real releases) or invent a new dialect that matches neither registry.</p>
+<p>So each ecosystem owns its own parser. <code>NpmEcosystem.parse_version</code> runs the input through a semver library;
+<code>PypiEcosystem.parse_version</code> runs it through <code>packaging.Version</code>. Both produce a common <code>ParsedVersion</code> with the four
+pieces of information the cooldown engine needs: major / minor / micro segments, a pre-release flag, and an opaque
+<code>sort_key</code> that defines what "newer than" means in that ecosystem's universe. The engine never sees the raw version
+string except to round-trip it back into manifests verbatim, which means a safe version of <code>idna 3.12</code> writes back as
+<code>3.12</code>, not as <code>3.12.0</code> or some other helpfully-canonicalized variant.</p>
+<p>This split is what fixed an early bug where <code>idna 3.12</code> (a perfectly valid PEP 440 release) was getting
+misclassified as <code>DEFAULT</code> because the shared parser only spoke semver. Now the pypi parser handles it as the patch
+release it actually is, and the cooldown windows apply correctly.</p>
+<h2 id="picking-a-safe-version">Picking a safe version</h2>
+<p>When a violation has a usable safe rollback target, the report includes it. <code>find_safe_version</code> walks the registry's
+release history for the same package, looking for the newest version that:</p>
+<ol>
+<li>Is <strong>strictly older</strong> than the currently installed version. We're rolling back, never forward.</li>
+<li>Has <strong>cleared its own cooldown</strong> window. A six-day-old patch isn't safer than the one we're trying to replace.</li>
+<li>Is <strong>not a pre-release</strong>. Betas and release candidates aren't valid rollback targets.</li>
+</ol>
+<p>The same <code>VersionParser</code> from the previous section drives both the ordering ("strictly older") and the pre-release
+filter, so the rollback search respects the same ecosystem semantics that classification did. The newest version that
+passes those three filters becomes the safe version. If nothing qualifies, the violation is reported without a
+rollback suggestion and <code>fix</code> will mark it <code>UnfixableViolation</code>.</p>
+<p>Note that <code>--fast</code> skips this lookup entirely. With <code>--fast</code>, the report still tells you what's in cooldown, but it
+won't suggest where to retreat to. Useful when you're using chill-out as a pure pass/fail gate and don't need the
+rollback guidance.</p>
+<h2 id="transitive-violations-and-the-dependency-tree">Transitive violations and the dependency tree</h2>
+<p>A transitive package can show up as a violation even though you don't depend on it directly. The report attributes the
+violation to the principal (the direct dependency that pulled the transitive in) and renders the chain so it's clear
+who to talk to:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>fastapi 0.110.0
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>└── starlette 0.36.3
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    └── anyio 4.3.0 (age 2d &gt; 14d)
+</span></code></pre></div>
+<p>The intermediate node versions are pulled from the project's lockfile, so the chain reflects what's actually installed,
+not what the registry currently lists as the latest. If you upgraded <code>fastapi</code> an hour ago, the chain shows the version
+the lockfile resolved to.</p>
+<h2 id="conflict-aware-rollback">Conflict-aware rollback</h2>
+<p>The interesting case is when a transitive violation can't be fixed by hoisting a direct pin. Suppose <code>anyio 4.3.0</code>
+violates cooldown and the safe version is <code>anyio 4.2.0</code>, but the principal <code>starlette 0.36.3</code> declares
+<code>anyio&gt;=4.3,&lt;5</code>. A direct pin to <code>4.2.0</code> won't take: the resolver will refuse it as soon as it sees starlette's
+declared range.</p>
+<p><code>find_safe_principal_version</code> handles this. It walks older versions of starlette, looking for one that:</p>
+<ol>
+<li>Has cleared its own cooldown.</li>
+<li>Is <strong>not</strong> a pre-release.</li>
+<li>Declares a range for <code>anyio</code> that the safe <code>4.2.0</code> satisfies, <strong>or</strong> doesn't declare <code>anyio</code> at all (in which case
+   it can't pull the violating version in by accident).</li>
+</ol>
+<p>If it finds one, the fix planner emits two <code>FixAction</code>s: a rollback of starlette and a direct pin of anyio. Both legs
+render as exact pins regardless of the configured <code>fix_style</code>, so the resolver can't drift back into the conflict on
+the next install. This is also why the principal/transitive distinction still earns its keep: to write a paired
+rollback we need to know which dependency sits at the top of <code>pyproject.toml</code> (or <code>package.json</code>) and which one is
+reached through it.</p>
+<p>If no qualifying principal version exists, the violation lands in the <code>UnfixableViolation</code> bucket with a structured
+reason explaining why, so the report can give the maintainer something better than "can't fix this, sorry."</p>
+<h2 id="override-fallback-npm">Override fallback (npm)</h2>
+<p>npm's hoisting rules and sticky lockfiles can defeat even a paired rollback. You pin a transitive at the safe version,
+re-run <code>npm install</code>, and the lockfile cheerfully reinstates the old one because some other package up the tree still
+prefers it.</p>
+<p>After the post-fix re-check, if any violation we <strong>just attempted to fix</strong> is still present, the npm backend falls back
+to writing the safe version into the workspace <code>overrides</code> block. Overrides are npm's resolver-level "I really mean it"
+mechanism: they win over every other declared range. The pipeline re-checks one more time after writing overrides; if
+the violation still survives, the report tells you so with enough context to fix by hand.</p>
+<p>The pypi backend doesn't currently have an equivalent fallback because uv's resolver respects direct pins more reliably
+in practice. If a case shows up where it doesn't, the same shape would work: a <code>[tool.uv.constraints]</code> block or
+similar.</p>
+<h2 id="why-these-choices">Why these choices</h2>
+<p>A few decisions are worth calling out, mostly because they constrain what chill-out tries to be.</p>
+<h3 id="lockfile-end-to-end-always">Lockfile end-to-end, always</h3>
+<p>Cooldown gives you the most protection when every package that will actually run in your environment has cleared the
+window. The lockfile is the only artifact that lists them all (principals, transitives, platform-specific resolutions,
+everything), so the lockfile is what gets audited. There's no "direct deps only" mode and no "fast path that skips the
+tree": the honest answer to "is my deploy safe?" needs the whole tree.</p>
+<p>This is also why <code>uv.lock</code> is required on pypi. Reading pinned specs out of <code>pyproject.toml</code> and pretending that's what
+got installed is a worse kind of wrong than a clear error message.</p>
+<h3 id="per-ecosystem-release-classification">Per-ecosystem release classification</h3>
+<p>Pre-1.0 versions, local versions, and vendor-tagged builds don't get major / minor / patch treatment; they fall
+through to <code>DEFAULT</code>. That's deliberate. Trying to assign release-type semantics to a string like
+<code>2.0.0a1+local.20240101</code> is a guessing game, and a wrong guess silently relaxes the threshold for that package. A
+single <code>default</code> knob is honest about the lack of structure.</p>
+<p>What does get a real classification is whatever the active ecosystem's parser recognizes. npm's parser is strict
+semver; pypi's parser is PEP 440, which means PyPI releases get classified using PyPI's own rules rather than a
+foreign approximation. The engine itself stays ecosystem-agnostic, so adding a third backend means writing a third
+parser, not changing the cooldown math.</p>
+<h3 id="exact-pins-by-default-for-fix_style">Exact pins by default for <code>fix_style</code></h3>
+<p>The default is <code>exact</code> because exact pins are the most aggressive way to make sure the resolver actually picks the
+version you asked for. <code>compatible</code> style writes a range that allows future patch and minor releases, which is friendly
+for routine maintenance but assumes the resolver will pick the safe version on the next <code>install</code> instead of jumping
+forward to whatever's newest. Both work; exact is the cautious default.</p>
+<h3 id="in-memory-cache-not-on-disk">In-memory cache, not on-disk</h3>
+<p>The registry cache is deliberately per-process. A persistent on-disk cache would save network traffic across runs, but
+it would also introduce a staleness window (packages do get yanked, timestamps do occasionally get corrected) and a
+cache directory the user has to know about. Keeping the cache in-memory means every run sees fresh data, the dedupe
+still covers the expensive case (repeated lookups within one invocation), and there's nothing to invalidate when
+something weird happens upstream.</p>
+<h3 id="no-global-wall-clock-cap">No global wall-clock cap</h3>
+<p>There's no top-level "give up after 30 seconds" timer in the pipeline. Each registry call has its own timeout (defaults
+to a sane value, configurable via <code>httpx</code>), and the parallel fanout keeps the worst case bounded by the slowest single
+package, not by the count of packages. Adding a global deadline would make the pipeline harder to reason about for very
+little benefit.</p>
+<h2 id="next-stops">Next stops</h2>
+<ul>
+<li><a href="../configuration/">Configuration</a> for the cooldown thresholds, dependency-group filters, and fix-style options the
+  pipeline reads at startup</li>
+<li><a href="../ecosystems/">Ecosystems</a> for the per-backend implementation details glossed over here</li>
+<li><a href="../api/">Programmatic API</a> for calling each phase directly from Python</li>
+<li><a href="../reference/">Reference</a> for the auto-generated module documentation</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../case-study/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Case study">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Case study
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../cli/" class="md-footer__link md-footer__link--next" aria-label="Next: CLI">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                CLI
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.expand","navigation.footer","navigation.tracking","content.code.copy"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.dbc0afdc.min.js"></script>
+      
+    
+  </body>
+</html>
