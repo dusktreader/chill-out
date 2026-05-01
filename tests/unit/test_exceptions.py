@@ -1,44 +1,66 @@
-import pytest
+"""Unit tests for exception types and the handle_errors decorator."""
+
 import typer
-
-from chill_out.exceptions import ChillOutError, handle_errors
-
-
-
-
-def test_error_raise_and_catch():
-    with pytest.raises(ChillOutError):
-        raise ChillOutError("something went wrong")
+from chill_out.constants import ExitCode
+from chill_out.exceptions import ChillOutError, ConfigError, handle_errors
+from typer.testing import CliRunner
 
 
-def test_error_message():
-    err = ChillOutError("test message")
-    assert "test message" in str(err)
+class TestChillOutError:
+    def test_default_subject_and_exit_code(self) -> None:
+        err = ChillOutError("boom")
+        assert err.subject is None
+        assert err.exit_code is ExitCode.GENERAL_ERROR
+
+    def test_overrides(self) -> None:
+        err = ChillOutError("boom", subject="hi", exit_code=ExitCode.CONFIG_ERROR)
+        assert err.subject == "hi"
+        assert err.exit_code is ExitCode.CONFIG_ERROR
+
+    def test_subclass_default_exit_code(self) -> None:
+        assert ConfigError("x").exit_code is ExitCode.CONFIG_ERROR
 
 
-def test_handle_errors_passes_through_success():
-    @handle_errors("boom")
-    def succeed(x: int) -> int:
-        return x + 1
+class TestHandleErrors:
+    def _make_app(self, command):
+        app = typer.Typer()
+        app.command()(command)
+        return app
 
-    assert succeed(1) == 2
+    def test_returns_normally_on_success(self) -> None:
+        @handle_errors("oops")
+        def ok() -> None:
+            typer.echo("hi")
 
+        runner = CliRunner()
+        result = runner.invoke(self._make_app(ok), [])
+        assert result.exit_code == 0
+        assert "hi" in result.stdout
 
-def test_handle_errors_catches_app_error():
-    @handle_errors("boom")
-    def fail():
-        raise ChillOutError("kaboom")
+    def test_translates_chill_out_error_to_exit_code(self) -> None:
+        @handle_errors("op failed")
+        def bad() -> None:
+            raise ConfigError("bad config")
 
-    with pytest.raises(typer.Exit) as exc_info:
-        fail()
-    assert exc_info.value.exit_code == 1
+        runner = CliRunner()
+        result = runner.invoke(self._make_app(bad), [])
+        assert result.exit_code == int(ExitCode.CONFIG_ERROR)
+        assert "bad config" in result.output or "bad config" in (result.stderr or "")
 
+    def test_unexpected_exception_becomes_internal_error(self) -> None:
+        @handle_errors("op failed")
+        def bad() -> None:
+            raise RuntimeError("kaboom")
 
-def test_handle_errors_catches_unexpected_error():
-    @handle_errors("boom")
-    def fail():
-        raise RuntimeError("unexpected")
+        runner = CliRunner()
+        result = runner.invoke(self._make_app(bad), [])
+        assert result.exit_code == int(ExitCode.INTERNAL_ERROR)
 
-    with pytest.raises(typer.Exit) as exc_info:
-        fail()
-    assert exc_info.value.exit_code == 1
+    def test_typer_exit_passes_through(self) -> None:
+        @handle_errors("op failed")
+        def bad() -> None:
+            raise typer.Exit(code=7)
+
+        runner = CliRunner()
+        result = runner.invoke(self._make_app(bad), [])
+        assert result.exit_code == 7

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/dusktreader/chill-out/discussions
+    about: Ask a question or start a discussion. Bugs and feature requests have their own templates.
+  - name: Security vulnerability
+    url: https://github.com/dusktreader/chill-out/security/advisories/new
+    about: Report security issues privately via a GitHub Security Advisory. Don't open a public issue for these.

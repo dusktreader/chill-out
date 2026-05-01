@@ -18,6 +18,8 @@ class Feature(StrEnum):
     """Available demo features."""
 
     basic = auto()
+    pypi = auto()
+    npm = auto()
 
 
 def start(

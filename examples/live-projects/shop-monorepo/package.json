@@ -1,0 +1,12 @@
+{
+  "name": "shop-monorepo",
+  "version": "0.1.0",
+  "description": "Anonymized npm workspace puzzle for chill-out: a shared transitive (@smithy/util-endpoints) is held back by api's direct pin, but worker pulls in a newer AWS SDK that wants the modern version. The conflict can only be resolved by an override at the workspace root.",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "api",
+    "worker",
+    "web"
+  ]
+}

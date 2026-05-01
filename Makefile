@@ -11,19 +11,22 @@ qa/test:  ## Run all tests (unit + integration)
 	@uv run pytest
 
 qa/test/unit:  ## Run unit tests only
-	@uv run pytest -m unit tests/unit
+	@uv run pytest tests/unit
 
 qa/test/integration:  ## Run integration tests only
-	@uv run pytest -m integration tests/integration
+	@uv run pytest tests/integration --no-cov
 
 qa/types:  ## Run static type checks
 	@uv run ty check ${PACKAGE_TARGET} tests src/chill_out_demo
 
 qa/lint:  ## Run linters
 	@uv run ruff check ${PACKAGE_TARGET} tests src/chill_out_demo examples
-	@uv run typos ${PACKAGE_TARGET} tests src/chill_out_demo docs/source
+	@uv run typos ${PACKAGE_TARGET} tests src/chill_out_demo docs/source examples *.md
 
-qa/full: qa/test qa/lint qa/types  ## Run the full set of quality checks
+qa/chill:  ## Dogfood: check our own dependency cooldowns
+	@uv run chill-out check
+
+qa/full: qa/test qa/lint qa/types qa/chill  ## Run the full set of quality checks
 	@echo "All quality checks pass!"
 
 qa/format:  ## Run code formatter
@@ -36,10 +39,10 @@ qa/format:  ## Run code formatter
 docs: docs/serve  ## Shortcut for docs/serve
 
 docs/build:  ## Build the documentation
-	@uv run mkdocs build --config-file=docs/mkdocs.yaml
+	@uv run --project docs zensical build --config-file=docs/mkdocs.yaml
 
 docs/serve:  ## Build the docs and start a local dev server
-	@uv run mkdocs serve --config-file=docs/mkdocs.yaml --dev-addr=localhost:10000
+	@uv run --project docs zensical serve --config-file=docs/mkdocs.yaml --dev-addr=localhost:10000
 
 ## ==== Application ====================================================================================================
 
@@ -58,10 +61,10 @@ app/debug:  ## Run the CLI application in debug mode
 demo: demo/run  ## Shortcut for demo/run
 
 demo/run:  ## Run the demo application
-	@uv run chill_out-demo
+	@uv run chill-out-demo
 
 demo/debug:  ## Run the demo application in debug mode
-	@uv run debugpy --listen localhost:5678 --wait-for-client chill_out-demo
+	@uv run debugpy --listen localhost:5678 --wait-for-client -m chill_out_demo.main
 
 
 
@@ -96,7 +99,7 @@ help:  ## Show help message
 
 .ONESHELL:
 SHELL:=/bin/bash
-.PHONY: qa qa/test qa/test/unit qa/test/integration qa/types qa/lint qa/full qa/format \
+.PHONY: qa qa/test qa/test/unit qa/test/integration qa/types qa/lint qa/chill qa/full qa/format \
 	docs docs/build docs/serve \
 	app app/run app/debug \
 	demo demo/run demo/debug \

@@ -1,0 +1,16 @@
+[project]
+name = "chill-out-python-example"
+version = "0.1.0"
+description = "An example Python project that chill-out can audit. Some declared deps land inside the cooldown window so the demo can show how the violations get resolved."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.110.0",
+    "httpx==0.27.0",
+    "rich==13.7.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.1.0",
+]
+

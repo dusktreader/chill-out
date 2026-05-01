@@ -1,0 +1,11 @@
+# chill-out cooldown configuration for the Python example project.
+#
+# Chill-out also accepts a `[tool.chill-out]` block in pyproject.toml or a
+# matching `dependabot.yml` cooldown entry. Pick exactly one source per
+# project; chill-out treats two simultaneous sources as a configuration
+# error so there's never any ambiguity about which one is in effect.
+cooldown:
+  default: 7
+  major: 30
+  minor: 14
+  patch: 7

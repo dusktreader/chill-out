@@ -1,5 +1,9 @@
 .junit.xml
 
+# npm artifacts (generated under examples/)
+node_modules/
+package-lock.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -16,6 +20,7 @@ param_dict.json
 application.sh
 lgcy*
 ~*
+*~
 # Distribution / packaging
 .Python
 build/
@@ -55,6 +60,7 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
+.coverage.xml
 .cache
 nosetests.xml
 coverage.xml
@@ -146,3 +152,7 @@ dmypy.json
 
 # snapcraft
 /*.snap
+
+docs/uv.lock
+docs/.venv/
+docs/site/
