@@ -5,7 +5,7 @@
 
 # chill-out
 
-![chill-out](https://github.com/dusktreader/chill-out/blob/main/docs/source/images/chill.png?raw=true)
+![chill-out](https://github.com/dusktreader/chill-out/blob/main/docs/source/images/chill-400.png?raw=true)
 
 _Have your dependencies chill out a bit while you make sure they are safe._
 
