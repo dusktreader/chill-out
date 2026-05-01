@@ -1,8 +1,9 @@
 # chill-out cooldown configuration for the Python example project.
 #
-# This file takes priority over [tool.chill-out.cooldown] in pyproject.toml,
-# which itself takes priority over .github/dependabot.yml. See docs for the
-# full layering rules.
+# Chill-out also accepts a `[tool.chill-out]` block in pyproject.toml or a
+# matching `dependabot.yml` cooldown entry. Pick exactly one source per
+# project; chill-out treats two simultaneous sources as a configuration
+# error so there's never any ambiguity about which one is in effect.
 cooldown:
   default: 7
   major: 30

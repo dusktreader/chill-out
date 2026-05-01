@@ -2,11 +2,9 @@
 Demos that exercise the full check pipeline against a Python project fixture.
 
 Each demo creates a tiny pyproject.toml in a temp directory, points
-`PypiRegistryClient` at a mock-backed httpx client, and runs the real
-`check_async` orchestrator end-to-end.
+`PypiEcosystem`'s registry calls at a mock-backed httpx client, and runs the
+real `check_async` orchestrator end-to-end.
 """
-
-from __future__ import annotations
 
 import asyncio
 import json
@@ -16,9 +14,10 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
+import tomlkit
 from chill_out import PypiEcosystem, check_async, plan_fixes
 from chill_out.constants import EcosystemKind
-from chill_out.ecosystems.pypi import PYPI_REGISTRY
+from chill_out.ecosystems.constants import PYPI_REGISTRY
 
 
 def _iso(days_ago: int) -> str:
@@ -26,14 +25,23 @@ def _iso(days_ago: int) -> str:
 
 
 def _make_pypi_project(tmp: Path) -> None:
-    (tmp / "pyproject.toml").write_text(
-        '[project]\nname = "demo-app"\nversion = "0.1.0"\ndependencies = ["fresh-pkg==2.0.0", "settled-pkg==1.0.0"]\n'
-    )
-    (tmp / "uv.lock").write_text(
-        "version = 1\n"
-        '[[package]]\nname = "fresh-pkg"\nversion = "2.0.0"\n\n'
-        '[[package]]\nname = "settled-pkg"\nversion = "1.0.0"\n'
-    )
+    pyproject = {
+        "project": {
+            "name": "demo-app",
+            "version": "0.1.0",
+            "dependencies": ["fresh-pkg==2.0.0", "settled-pkg==1.0.0"],
+        },
+    }
+    (tmp / "pyproject.toml").write_text(tomlkit.dumps(pyproject))
+
+    lockfile = {
+        "version": 1,
+        "package": [
+            {"name": "fresh-pkg", "version": "2.0.0"},
+            {"name": "settled-pkg", "version": "1.0.0"},
+        ],
+    }
+    (tmp / "uv.lock").write_text(tomlkit.dumps(lockfile))
 
 
 def _seed_registry() -> None:
@@ -89,9 +97,19 @@ def demo_02_pypi_plan_fixes() -> None:
         _make_pypi_project(tmp)
         report = asyncio.run(check_async(PypiEcosystem(tmp)))
     actions = plan_fixes(report)
-    print(json.dumps({"actions": [a.__dict__ for a in actions.actions], "unfixable": [
-        {"package": u.violation.name, "version": u.violation.version, "reason": u.reason} for u in actions.unfixable
-    ]}, indent=2, default=str))
+    print(
+        json.dumps(
+            {
+                "actions": [a.__dict__ for a in actions.actions],
+                "unfixable": [
+                    {"package": u.violation.name, "version": u.violation.version, "reason": u.reason}
+                    for u in actions.unfixable
+                ],
+            },
+            indent=2,
+            default=str,
+        )
+    )
 
 
 @respx.mock

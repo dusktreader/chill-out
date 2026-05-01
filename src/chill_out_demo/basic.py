@@ -5,19 +5,21 @@ Each function is self-contained and prints to stdout so the demo runner can
 display the captured output alongside the source.
 """
 
-from __future__ import annotations
-
 import pendulum
 from chill_out import (
-    ReleaseType,
-    CooldownConfig,
+    ChillOutConfig,
+    NpmEcosystem,
     PackageInfo,
     PackageRelease,
+    ReleaseType,
     __version__,
-    find_safe_version,
-    is_within_cooldown,
-    release_type,
 )
+from chill_out.cooldown import find_safe_version, is_within_cooldown, release_type
+
+# The cooldown helpers are ecosystem-agnostic and take a parser callable so they
+# can work the same way against npm's strict semver and pypi's PEP 440. For the
+# demo we plug in npm's parser since the example version strings are semver.
+_PARSER = NpmEcosystem(root=__import__("pathlib").Path(".")).parse_version
 
 
 def demo_01_version() -> None:
@@ -34,11 +36,11 @@ def demo_02_release_type() -> None:
     """
     Classify a version string into a major / minor / patch release.
 
-    `release_type` understands semver and falls back to `ReleaseType.DEFAULT` for
-    anything it cannot parse.
+    `release_type` takes an ecosystem-specific parser and falls back to
+    `ReleaseType.DEFAULT` for anything the parser cannot make sense of.
     """
     for version in ("2.0.0", "2.1.0", "2.1.3", "garbage"):
-        kind = release_type(version)
+        kind = release_type(version, _PARSER)
         print(f"{version:10s} -> {kind.value}")
 
 
@@ -49,7 +51,7 @@ def demo_03_is_within_cooldown() -> None:
     `is_within_cooldown` returns a tuple of `(violating, age_days, limit_days)`
     so callers can render their own messaging.
     """
-    config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
+    config = ChillOutConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.DEFAULT: 5})
     published = pendulum.now("UTC").subtract(days=2)
     violating, age, limit = is_within_cooldown(published, ReleaseType.MAJOR, config)
     print(f"violating={violating}  age={age}d  limit={limit}d")
@@ -71,8 +73,10 @@ def demo_04_find_safe_version() -> None:
             "1.4.0": PackageRelease(version="1.4.0", published=now.subtract(days=120)),
         },
     )
-    config = CooldownConfig(cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5})
-    safe = find_safe_version("2.0.0", info, config)
+    config = ChillOutConfig(
+        cooldown_days={ReleaseType.MAJOR: 30, ReleaseType.MINOR: 10, ReleaseType.PATCH: 7, ReleaseType.DEFAULT: 5}
+    )
+    safe = find_safe_version("2.0.0", info, config, _PARSER)
     if safe is None:
         print("no safe rollback target")
     else:

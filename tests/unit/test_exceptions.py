@@ -1,7 +1,5 @@
 """Unit tests for exception types and the handle_errors decorator."""
 
-from __future__ import annotations
-
 import typer
 from chill_out.constants import ExitCode
 from chill_out.exceptions import ChillOutError, ConfigError, handle_errors

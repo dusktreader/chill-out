@@ -1,12 +1,10 @@
 """
-Build a `CooldownConfig` in code and pass it to `check_async`.
+Build a `ChillOutConfig` in code and pass it to `check_async`.
 
 When the threshold values come from a database, a remote service, or just
 hard-coded policy you can skip the file-based loader entirely and construct
-the `CooldownConfig` yourself.
+the `ChillOutConfig` yourself.
 """
-
-from __future__ import annotations
 
 import asyncio
 import tempfile
@@ -15,8 +13,9 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
-from chill_out import ReleaseType, CooldownConfig, PypiEcosystem, check_async
-from chill_out.ecosystems.pypi import PYPI_REGISTRY
+import tomlkit
+from chill_out import ChillOutConfig, PypiEcosystem, ReleaseType, check_async
+from chill_out.ecosystems.constants import PYPI_REGISTRY
 
 
 def _iso(days_ago: int) -> str:
@@ -33,7 +32,7 @@ def main() -> None:
     )
 
     # Strict policy: even patch releases need 14 days to settle.
-    config = CooldownConfig(
+    config = ChillOutConfig(
         cooldown_days={
             ReleaseType.MAJOR: 60,
             ReleaseType.MINOR: 30,
@@ -44,9 +43,21 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as raw_tmp:
         root = Path(raw_tmp)
-        (root / "pyproject.toml").write_text(
-            '[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = ["example-pkg==1.0.0"]\n'
-        )
+        pyproject = {
+            "project": {
+                "name": "demo",
+                "version": "0.1.0",
+                "dependencies": ["example-pkg==1.0.0"],
+            },
+        }
+        (root / "pyproject.toml").write_text(tomlkit.dumps(pyproject))
+        # chill-out audits uv.lock; build the minimum one our single-package
+        # demo needs. Real projects get this from `uv lock`.
+        lockfile = {
+            "version": 1,
+            "package": [{"name": "example-pkg", "version": "1.0.0"}],
+        }
+        (root / "uv.lock").write_text(tomlkit.dumps(lockfile))
         report = asyncio.run(check_async(PypiEcosystem(root), config=config))
 
     print(f"violations: {len(report.violations)}")

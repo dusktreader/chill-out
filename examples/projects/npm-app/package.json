@@ -10,14 +10,5 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
-  },
-  "chill-out": {
-    "_comment": "Same windows as .chill-out.yaml; included here so you can see the package.json form too. The yaml file wins because it sits higher in the layering, but both schemas are interchangeable.",
-    "cooldown": {
-      "default": 7,
-      "major": 30,
-      "minor": 14,
-      "patch": 7
-    }
   }
 }

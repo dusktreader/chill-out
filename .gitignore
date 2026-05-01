@@ -20,6 +20,7 @@ param_dict.json
 application.sh
 lgcy*
 ~*
+*~
 # Distribution / packaging
 .Python
 build/
@@ -59,6 +60,7 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
+.coverage.xml
 .cache
 nosetests.xml
 coverage.xml

@@ -11,17 +11,17 @@ qa/test:  ## Run all tests (unit + integration)
 	@uv run pytest
 
 qa/test/unit:  ## Run unit tests only
-	@uv run pytest -m unit tests/unit
+	@uv run pytest tests/unit
 
 qa/test/integration:  ## Run integration tests only
-	@uv run pytest -m integration tests/integration
+	@uv run pytest tests/integration --no-cov
 
 qa/types:  ## Run static type checks
 	@uv run ty check ${PACKAGE_TARGET} tests src/chill_out_demo
 
 qa/lint:  ## Run linters
 	@uv run ruff check ${PACKAGE_TARGET} tests src/chill_out_demo examples
-	@uv run typos ${PACKAGE_TARGET} tests src/chill_out_demo docs/source
+	@uv run typos ${PACKAGE_TARGET} tests src/chill_out_demo docs/source examples *.md
 
 qa/chill:  ## Dogfood: check our own dependency cooldowns
 	@uv run chill-out check

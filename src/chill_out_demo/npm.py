@@ -5,8 +5,6 @@ These mock the npm registry with `respx` and stub the `npm list` subprocess
 call so the demo never needs the real `npm` binary.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import tempfile
@@ -17,7 +15,7 @@ import httpx
 import pendulum
 import respx
 from chill_out import NpmEcosystem, check_async, plan_fixes
-from chill_out.ecosystems.npm import NPM_REGISTRY
+from chill_out.ecosystems.constants import NPM_REGISTRY
 
 
 def _iso(days_ago: int) -> str:

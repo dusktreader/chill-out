@@ -10,8 +10,6 @@ Run it with::
     uv run python examples/programmatic_npm.py
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import tempfile
@@ -22,7 +20,7 @@ import httpx
 import pendulum
 import respx
 from chill_out import NpmEcosystem, check_async
-from chill_out.ecosystems.npm import NPM_REGISTRY
+from chill_out.ecosystems.constants import NPM_REGISTRY
 
 
 def _iso(days_ago: int) -> str:

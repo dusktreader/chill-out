@@ -2,14 +2,30 @@
 Shared pytest fixtures.
 """
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
 import pendulum
 import pytest
+import tomlkit
+from chill_out.ecosystems import retry as _retry_module
+from tenacity import wait_none
 from typer.testing import CliRunner
+
+
+@pytest.fixture(autouse=True)
+def _instant_registry_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip backoff from the registry retry helper for the test run.
+
+    Production uses exponential jitter with a few-second worst case, which
+    would add real wall time to every retry-exercising test. The retry logic
+    itself is what we want to verify; the timing is a separate concern.
+    """
+    # Tenacity attaches the runtime config to the wrapped callable as a
+    # `retry` attribute, but the type stubs don't surface it. Reach for the
+    # attribute via `getattr` to keep ty quiet.
+    retrying = getattr(_retry_module.retried_get, "retry")
+    monkeypatch.setattr(retrying, "wait", wait_none())
 
 
 @pytest.fixture
@@ -42,32 +58,27 @@ def npm_project(tmp_path: Path) -> Path:
 @pytest.fixture
 def pypi_project(tmp_path: Path) -> Path:
     """A minimal Python project root with a pyproject.toml and uv.lock."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "fixture-app"\nversion = "0.1.0"\ndependencies = ["requests==2.31.0", "click==8.1.7"]\n'
-    )
-    (tmp_path / "uv.lock").write_text(
-        "version = 1\n"
-        "\n"
-        "[[package]]\n"
-        'name = "requests"\n'
-        'version = "2.31.0"\n'
-        "\n"
-        "[[package]]\n"
-        'name = "click"\n'
-        'version = "8.1.7"\n'
-        "\n"
-        "[[package]]\n"
-        'name = "urllib3"\n'
-        'version = "2.0.7"\n'
-        "dependencies = []\n"
-        "\n"
-        "[[package]]\n"
-        'name = "fixture-app"\n'
-        'version = "0.1.0"\n'
-        "[[package.dependencies]]\n"
-        'name = "requests"\n'
-        "\n"
-        "[[package.dependencies]]\n"
-        'name = "click"\n'
-    )
+    pyproject = {
+        "project": {
+            "name": "fixture-app",
+            "version": "0.1.0",
+            "dependencies": ["requests==2.31.0", "click==8.1.7"],
+        },
+    }
+    (tmp_path / "pyproject.toml").write_text(tomlkit.dumps(pyproject))
+
+    lockfile = {
+        "version": 1,
+        "package": [
+            {"name": "requests", "version": "2.31.0"},
+            {"name": "click", "version": "8.1.7"},
+            {"name": "urllib3", "version": "2.0.7", "dependencies": []},
+            {
+                "name": "fixture-app",
+                "version": "0.1.0",
+                "dependencies": [{"name": "requests"}, {"name": "click"}],
+            },
+        ],
+    }
+    (tmp_path / "uv.lock").write_text(tomlkit.dumps(lockfile))
     return tmp_path

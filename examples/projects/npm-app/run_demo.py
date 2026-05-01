@@ -20,10 +20,8 @@ The script:
 3. Prints the violations and the fix plan.
 4. Applies the fixes to a *copy* of the project so the on-disk fixture stays
    pristine, and prints the resulting `package.json` so you can see exactly
-   what `--fix` would have written.
+   what `chill-out fix` would have written.
 """
-
-from __future__ import annotations
 
 import asyncio
 import json
@@ -40,7 +38,7 @@ import respx
 from chill_out import NpmEcosystem, check_async, plan_fixes_async
 from chill_out.config import load_config
 from chill_out.constants import EcosystemKind
-from chill_out.ecosystems.npm import NPM_REGISTRY
+from chill_out.ecosystems.constants import NPM_REGISTRY
 
 PROJECT_ROOT = Path(__file__).parent
 NOW = pendulum.datetime(2026, 1, 1, tz="UTC")
@@ -196,7 +194,7 @@ def main() -> None:
         patch.object(NpmEcosystem, "_npm_list", return_value=NPM_LIST_OUTPUT),
         patch.object(NpmEcosystem, "range_satisfies", _fake_range_satisfies),
     ):
-        report = asyncio.run(check_async(ecosystem, config=config, deep=True, now=NOW))
+        report = asyncio.run(check_async(ecosystem, config=config, now=NOW))
         actions = asyncio.run(
             plan_fixes_async(report, ecosystem, config=config, now=NOW),
         )
@@ -234,10 +232,10 @@ def main() -> None:
         tmp = Path(raw_tmp) / "npm-app-copy"
         shutil.copytree(PROJECT_ROOT, tmp)
         copy_eco = NpmEcosystem(tmp)
-        with patch("chill_out.ecosystems.npm.subprocess.run", side_effect=_fake_subprocess_run):
+        with patch("chill_out.ecosystems.npm.backend.subprocess.run", side_effect=_fake_subprocess_run):
             applied = copy_eco.apply_fixes(actions.actions)
         print("apply log:")
-        for line in applied:
+        for line in applied.log:
             print(f"  - {line}")
         patched = json.loads((tmp / "package.json").read_text())
         print()

@@ -2,14 +2,13 @@
 Shared dataclasses representing packages, registry data, violations, and fix actions.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pendulum
 
-from chill_out.constants import DependencyGroup, FixStyle, ReleaseType, EcosystemKind
+from chill_out.constants import AuditStatus, DependencyGroup, EcosystemKind, FixStyle, ReleaseType
+from chill_out.state.models import ManagedPin
 
 
 @dataclass(frozen=True)
@@ -42,9 +41,9 @@ class InstalledPackage:
     """
     Semantic groups this installation belongs to.
 
-    For principals (``via_chain`` empty), this is the set of declaration
+    For principals (`via_chain` empty), this is the set of declaration
     sections the package appears in (a package can be listed in more than
-    one section, e.g. both ``dependencies`` and ``peerDependencies``).
+    one section, e.g. both `dependencies` and `peerDependencies`).
     For transitives, this is the union of the groups of every top-level
     dependency that pulls the install into the tree, matching the
     "included if reachable through any included group" semantic the
@@ -67,10 +66,19 @@ class InstalledPackage:
 
 @dataclass(frozen=True)
 class PackageRelease:
-    """A single released version of a package, with its publish timestamp."""
+    """
+    A single released version of a package, with its publish timestamp.
+
+    `yanked` reflects the registry's withdraw signal: a yanked PyPI release
+    (every artifact marked yanked) or an npm version that's been unpublished
+    (present in the `time` map but missing from `versions`). Yanked releases
+    still appear in the registry response so historical resolves keep working,
+    but chill-out treats them as unsafe upgrade targets.
+    """
 
     version: str
     published: pendulum.DateTime
+    yanked: bool = False
 
 
 @dataclass(frozen=True)
@@ -91,9 +99,9 @@ class VersionManifest:
     """
     The dependency declarations for a single (name, version) pair.
 
-    ``deps`` maps each declared dependency name to its raw range spec, in the
-    native format of the ecosystem (e.g. ``"^2.0.0"`` for npm or
-    ``">=2.5,<3.0"`` for PyPI).
+    `deps` maps each declared dependency name to its raw range spec, in the
+    native format of the ecosystem (e.g. `"^2.0.0"` for npm or
+    `">=2.5,<3.0"` for PyPI).
     """
 
     name: str
@@ -145,20 +153,20 @@ class Violation:
 
 @dataclass(frozen=True)
 class FixAction:
-    """A single change to apply when running `--fix`.
+    """A single change to apply when running `chill-out fix`.
 
     Both direct and transitive violations land in the same shape: a pin of
-    ``package`` to ``version`` written to the project's primary manifest
-    (``project.dependencies`` for pypi, ``dependencies`` for npm). Transitive
+    `package` to `version` written to the project's primary manifest
+    (`project.dependencies` for pypi, `dependencies` for npm). Transitive
     pins ride along as direct entries; the ecosystem resolver hoists them.
 
-    ``style`` controls how the new constraint is rendered into the manifest.
-    See :class:`chill_out.constants.FixStyle` for the available choices.
-    Override-style actions (``via_overrides=True``) are always written as
-    exact pins regardless of ``style``, since the whole point of an override
+    `style` controls how the new constraint is rendered into the manifest.
+    See `chill_out.constants.FixStyle` for the available choices.
+    Override-style actions (`via_overrides=True`) are always written as
+    exact pins regardless of `style`, since the whole point of an override
     is to dodge a specific just-released version.
 
-    When ``via_overrides`` is True the pin should be applied via the
+    When `via_overrides` is True the pin should be applied via the
     ecosystem's "force every transitive copy" mechanism instead of a direct
     dependency entry. The runner sets this for shared transitive
     violations in workspace contexts where a member-level direct pin
@@ -175,8 +183,8 @@ class FixAction:
 class WorkspaceTopology:
     """Layout of a multi-member workspace.
 
-    ``root`` is the directory that owns the lockfile and is the right place
-    to apply tree-wide overrides. ``members`` maps each member's declared
+    `root` is the directory that owns the lockfile and is the right place
+    to apply tree-wide overrides. `members` maps each member's declared
     package name to its directory.
     """
 
@@ -186,13 +194,26 @@ class WorkspaceTopology:
 
 @dataclass(frozen=True)
 class UnfixableViolation:
-    """A violation that ``--fix`` could not auto-resolve.
+    """A violation that `chill-out fix` could not auto-resolve.
 
     Surfaces the structured reason so the CLI can print actionable guidance
     instead of silently dropping the violation.
     """
 
     violation: Violation
+    reason: str
+
+
+@dataclass(frozen=True)
+class SkipReason:
+    """A package that the check could not evaluate, paired with the reason it was skipped.
+
+    Skips happen when the registry has no record of the package, when the registry call itself
+    fails, or when the installed version has no recorded publish date. The `reason` is a
+    human-readable explanation suitable for surfacing in CLI output.
+    """
+
+    package: InstalledPackage
     reason: str
 
 
@@ -204,6 +225,36 @@ class FixPlan:
     unfixable: list[UnfixableViolation] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class AppliedFix:
+    """A single fix that was successfully written into the project's manifest.
+
+    Pairs the original `FixAction` with the literal value that landed in the manifest. The
+    `pinned_spec` may differ from `action.version` for `FixStyle.COMPATIBLE` (e.g. `"^1.2.3"` for
+    npm or `"foo>=1.0,<2.0.0"` for pypi); recording the literal value is what makes drift
+    detection on the next fix run possible. `manifest_path` records where the entry landed,
+    relative to the ecosystem's project root, so the next run can revisit the exact same site.
+    """
+
+    action: FixAction
+    pinned_spec: str
+    via_overrides: bool
+    manifest_path: Path
+
+
+@dataclass
+class AppliedFixes:
+    """Structured outcome of an `apply_fixes` or `apply_override_fixes` call.
+
+    `entries` holds one `AppliedFix` per action that was actually written, in the order they were
+    applied. `log` is the human-readable list of changes intended for CLI output, preserving the
+    same shape every ecosystem produced before structured outputs existed.
+    """
+
+    entries: list[AppliedFix] = field(default_factory=list)
+    log: list[str] = field(default_factory=list)
+
+
 @dataclass
 class CheckReport:
     """Aggregated outcome of a check run."""
@@ -211,8 +262,76 @@ class CheckReport:
     ecosystem: EcosystemKind
     checked: list[InstalledPackage]
     violations: list[Violation] = field(default_factory=list)
-    skipped: list[tuple[InstalledPackage, str]] = field(default_factory=list)
+    skipped: list[SkipReason] = field(default_factory=list)
 
     @property
     def has_violations(self) -> bool:
         return bool(self.violations)
+
+
+@dataclass(frozen=True)
+class AuditedPin:
+    """One managed pin paired with the freshly fetched status of the version it's avoiding.
+
+    `chill-out audit` builds one of these per entry in `state.managed_pins`,
+    queries the registry for the avoided release's current state, and slots
+    each pin into `AuditStatus.FRESH` (still in cooldown -- pin is earning
+    its keep), `AuditStatus.STALE` (the avoided release has cleared its
+    cooldown -- pin is no longer needed), `AuditStatus.YANKED` (the
+    registry pulled the avoided release outright -- pin is no longer needed,
+    with extra confidence), or `AuditStatus.UNKNOWN` (registry skipped the
+    package or no longer carries the version -- surfaced so the user can
+    decide whether to retire the pin manually).
+
+    `current_age_days` is the age of the avoided release at audit time.
+    `None` for `UNKNOWN` entries where the publish date isn't available.
+    `cooldown_days` is the threshold that applied when the pin was created
+    and is replayed here for context.
+    """
+
+    pin: ManagedPin
+    status: AuditStatus
+    current_age_days: int | None
+    cooldown_days: int
+    detail: str | None = None
+    """
+    Human-readable extra context for `UNKNOWN` and `YANKED` entries.
+
+    For `UNKNOWN`, this carries the registry's skip reason. For `YANKED`,
+    it carries any registry-provided yank reason if one is later plumbed
+    through; today the field is set to `None` and reserved for future use.
+    """
+
+
+@dataclass
+class AuditReport:
+    """Aggregated outcome of an `audit` run.
+
+    `entries` is in the same order as the state file's `managed_pins`, so
+    the report's table mirrors the user's mental model of the file. The
+    bucket properties slice the same data three ways for the renderer.
+    """
+
+    ecosystem: EcosystemKind
+    entries: list[AuditedPin] = field(default_factory=list)
+
+    @property
+    def fresh(self) -> list[AuditedPin]:
+        return [e for e in self.entries if e.status is AuditStatus.FRESH]
+
+    @property
+    def stale(self) -> list[AuditedPin]:
+        return [e for e in self.entries if e.status is AuditStatus.STALE]
+
+    @property
+    def yanked(self) -> list[AuditedPin]:
+        return [e for e in self.entries if e.status is AuditStatus.YANKED]
+
+    @property
+    def unknown(self) -> list[AuditedPin]:
+        return [e for e in self.entries if e.status is AuditStatus.UNKNOWN]
+
+    @property
+    def has_actionable(self) -> bool:
+        """True when any pin can be retired (stale or yanked)."""
+        return bool(self.stale or self.yanked)

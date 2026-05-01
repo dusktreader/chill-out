@@ -18,8 +18,6 @@ from chill_out.constants import ExitCode
 class ChillOutError(Buzz):
     """Base exception class for all `chill-out` errors."""
 
-    __test__ = False  # Prevent pytest from collecting this as a test class
-
     subject: str | None = None
     """ Subject shown in the user-facing error message. """
 

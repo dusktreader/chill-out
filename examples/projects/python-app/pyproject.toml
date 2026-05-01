@@ -14,11 +14,3 @@ dev = [
     "pytest==8.1.0",
 ]
 
-[tool.chill-out.cooldown]
-# Same windows as .chill-out.yaml; included here so you can see the
-# pyproject.toml form too. The yaml file wins because it sits higher in
-# the layering, but both schemas are interchangeable.
-default = 7
-major = 30
-minor = 14
-patch = 7

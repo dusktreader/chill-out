@@ -2,5 +2,5 @@
 #
 # Defaults handle everything we need (main-only, standard cooldown
 # thresholds), so this file mostly exists for discoverability and to
-# pin the fix style we want when running --fix.
+# pin the fix style we want when running `chill-out fix`.
 fix_style: compatible

@@ -1,57 +1,69 @@
 """
 Top-level orchestration for the chill-out check workflow.
 
-Combines an :class:`Ecosystem` backend with the cooldown logic to produce a
-:class:`CheckReport` and, optionally, a list of :class:`FixAction`.
+Combines an `Ecosystem` backend with the cooldown logic to produce a
+`CheckReport` and, optionally, a list of `FixAction`.
 """
-
-from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import httpx
 import pendulum
 from loguru import logger
 
-from chill_out.cache import CachingRegistryClient
-from chill_out.config import CooldownConfig, load_config
-from chill_out.constants import DEFAULT_CONCURRENCY, DEFAULT_TIMEOUT, EcosystemKind, FixStyle
+from chill_out.config import ChillOutConfig, load_config
+from chill_out.constants import DEFAULT_CONCURRENCY, DEFAULT_TIMEOUT, AuditStatus, EcosystemKind, FixStyle
 from chill_out.cooldown import find_safe_principal_version, find_safe_version, is_within_cooldown, release_type
 from chill_out.ecosystems import detect_ecosystem, get_ecosystem
-from chill_out.ecosystems.base import Ecosystem, RegistryClient
-from chill_out.exceptions import RegistryError
+from chill_out.ecosystems.backend import Ecosystem
+from chill_out.ecosystems.version_parsing import VersionParser
+from chill_out.exceptions import ChillOutError, RegistryError
 from chill_out.models import (
+    AppliedFixes,
+    AuditedPin,
+    AuditReport,
     CheckReport,
     FixAction,
     FixPlan,
     InstalledPackage,
     PackageInfo,
+    SkipReason,
     UnfixableViolation,
     Violation,
 )
+from chill_out.registry_client import RegistryClient
+from chill_out.state import (
+    AvoidingRelease,
+    ChillOutState,
+    ManagedPin,
+    PinMechanism,
+    RemovalOutcome,
+)
 
 
-async def _check_one(
+async def check_one(
     pkg: InstalledPackage,
     client: RegistryClient,
-    config: CooldownConfig,
+    config: ChillOutConfig,
     semaphore: asyncio.Semaphore,
     *,
     fast: bool,
+    parser: VersionParser,
     now: pendulum.DateTime,
     on_complete: Callable[[InstalledPackage], None] | None = None,
-) -> tuple[InstalledPackage, Violation | str | None]:
+) -> Violation | SkipReason | None:
     """
     Fetch and evaluate a single package.
 
     Returns:
-        ``(pkg, Violation)`` if the package is in cooldown,
-        ``(pkg, "skip reason")`` if it could not be evaluated,
-        ``(pkg, None)`` if it has cleared cooldown.
+        A `Violation` if the package is within its cooldown window,
+        a `SkipReason` if the package could not be evaluated,
+        or `None` if it has cleared cooldown.
 
-    The ``on_complete`` callback fires once the package has been evaluated,
+    The `on_complete` callback fires once the package has been evaluated,
     regardless of outcome. Useful for wiring up progress reporting without
     coupling the runner to a particular UI library.
     """
@@ -61,25 +73,29 @@ async def _check_one(
                 info = await client.fetch_package(pkg.name)
             except RegistryError as exc:
                 logger.warning(f"Skipping {pkg.name}: {exc}")
-                return pkg, str(exc)
+                return SkipReason(package=pkg, reason=str(exc))
+
             if info is None:
-                return pkg, "not found in registry"
+                return SkipReason(package=pkg, reason="not found in registry")
+
             published = info.published_at(pkg.version)
             if published is None:
-                return pkg, f"no publish date for {pkg.version}"
-            rel_type = release_type(pkg.version)
+                return SkipReason(package=pkg, reason=f"no publish date for {pkg.version}")
+
+            rel_type = release_type(pkg.version, parser)
             violating, age_days, limit_days = is_within_cooldown(published, rel_type, config, now=now)
-            if not violating:
-                return pkg, None
-            safe = None if fast else find_safe_version(pkg.version, info, config, now=now)
-            return pkg, Violation(
-                package=pkg,
-                release_type=rel_type,
-                age_days=age_days,
-                limit_days=limit_days,
-                published=published,
-                safe_version=safe,
-            )
+            if violating:
+                safe = None if fast else find_safe_version(pkg.version, info, config, parser, now=now)
+                return Violation(
+                    package=pkg,
+                    release_type=rel_type,
+                    age_days=age_days,
+                    limit_days=limit_days,
+                    published=published,
+                    safe_version=safe,
+                )
+            return None
+
         finally:
             if on_complete is not None:
                 on_complete(pkg)
@@ -88,8 +104,7 @@ async def _check_one(
 async def check_async(
     ecosystem: Ecosystem,
     *,
-    config: CooldownConfig | None = None,
-    deep: bool = False,
+    config: ChillOutConfig | None = None,
     fast: bool = False,
     concurrency: int = DEFAULT_CONCURRENCY,
     http: httpx.AsyncClient | None = None,
@@ -100,24 +115,27 @@ async def check_async(
     """
     Run the full cooldown check for the given ecosystem.
 
+    Every package recorded in the project's lockfile is audited, principals and transitives
+    alike. The lockfile is the source of truth for what the ecosystem will actually install;
+    anything declared in the project's primary manifest but not yet locked is out of scope by
+    design.
+
     Args:
-        ecosystem: The detected or selected ecosystem backend.
-        config: Cooldown configuration. If omitted, it is loaded from the
-            ecosystem's project root.
-        deep: If True, include transitive dependencies in the check.
-        fast: If True, skip the safe-version lookup for faster runs.
+        ecosystem:   The detected or selected ecosystem backend.
+        config:      Cooldown configuration. If omitted, it is loaded from the ecosystem's project root.
+        fast:        If True, skip the safe-version lookup for faster runs.
         concurrency: Maximum simultaneous registry requests.
-        http: Optional pre-configured HTTP client (mostly useful for testing).
-        now: Override the "now" timestamp used when comparing ages (testing).
-        on_start: Optional callback fired once with the full list of packages
-            about to be checked. Use it to size a progress bar.
-        on_progress: Optional callback fired once per package after it has
-            been evaluated. Use it to advance a progress bar.
+        http:        Optional pre-configured HTTP client (mostly useful for testing).
+        now:         Override the "now" timestamp used when comparing ages (testing).
+        on_start:    Optional callback fired once with the full list of packages about to be checked. Use it to size a
+                     progress bar.
+        on_progress: Optional callback fired once per package after it has been evaluated. Use it to advance a
+                     progress bar.
     """
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
-    all_packages = ecosystem.load_installed(deep=deep)
-    packages = _filter_by_groups(all_packages, config)
+    all_packages = ecosystem.load_installed()
+    packages = filter_by_groups(all_packages, config)
     if on_start is not None:
         on_start(list(packages))
     semaphore = asyncio.Semaphore(concurrency)
@@ -125,12 +143,14 @@ async def check_async(
     own_http = http is None
     if own_http:
         http = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
-    assert http is not None
+    http = ChillOutError.enforce_defined(http, "internal error: http client was not initialized")
+
     try:
-        client = CachingRegistryClient(ecosystem.make_client(http))
+        client = RegistryClient(ecosystem, http)
+        parser = ecosystem.parse_version
         results = await asyncio.gather(
             *(
-                _check_one(pkg, client, config, semaphore, fast=fast, now=now, on_complete=on_progress)
+                check_one(pkg, client, config, semaphore, fast=fast, parser=parser, now=now, on_complete=on_progress)
                 for pkg in packages
             )
         )
@@ -139,11 +159,11 @@ async def check_async(
             await http.aclose()
 
     report = CheckReport(ecosystem=ecosystem.kind, checked=list(packages))
-    for pkg, outcome in results:
+    for outcome in results:
         if isinstance(outcome, Violation):
             report.violations.append(outcome)
-        elif isinstance(outcome, str):
-            report.skipped.append((pkg, outcome))
+        elif isinstance(outcome, SkipReason):
+            report.skipped.append(outcome)
     return report
 
 
@@ -151,22 +171,20 @@ def check(
     root: Path,
     *,
     ecosystem_kind: EcosystemKind | None = None,
-    config: CooldownConfig | None = None,
-    deep: bool = False,
+    config: ChillOutConfig | None = None,
     fast: bool = False,
     concurrency: int = DEFAULT_CONCURRENCY,
 ) -> CheckReport:
     """
-    Synchronous convenience wrapper around :func:`check_async`.
+    Synchronous convenience wrapper around `check_async`.
 
-    Auto-detects the ecosystem from ``root`` unless ``ecosystem_kind`` is given.
+    Auto-detects the ecosystem from `root` unless `ecosystem_kind` is given.
     """
     ecosystem = get_ecosystem(ecosystem_kind, root) if ecosystem_kind else detect_ecosystem(root)
     return asyncio.run(
         check_async(
             ecosystem,
             config=config,
-            deep=deep,
             fast=fast,
             concurrency=concurrency,
         )
@@ -177,29 +195,25 @@ def plan_fixes(report: CheckReport, *, fix_style: FixStyle = FixStyle.EXACT) -> 
     """
     Build a basic fix plan from a report, without principal range checking.
 
-    Each violation with a known safe version becomes a single :class:`FixAction`
-    that pins the package directly (in ``project.dependencies`` for pypi, in
-    ``dependencies`` for npm). Transitive violations get pinned as direct deps
-    too, so the resolver hoists them and they win over the principal's
-    declared range. Violations with no known safe version land in
-    :attr:`FixPlan.unfixable` so the caller can report them.
+    Each violation with a known safe version becomes a single `FixAction` that pins the package
+    directly in the project's primary manifest. Transitive violations get pinned as direct deps
+    too, so the resolver hoists them and they win over the principal's declared range. Violations
+    with no known safe version land in `FixPlan.unfixable` so the caller can report them.
 
-    The ``fix_style`` parameter controls how each pin is rendered into the
-    manifest. See :class:`chill_out.constants.FixStyle`.
+    The `fix_style` parameter controls how each pin is rendered into the
+    manifest. See `chill_out.constants.FixStyle`.
 
     For the smarter version that range-checks transitive pins against the
     installed principal and rolls the principal back when the declared range
-    can't admit the safe transitive, use :func:`plan_fixes_async`.
+    can't admit the safe transitive, use `plan_fixes_async`.
     """
     plan = FixPlan()
     for v in report.violations:
         if v.safe_version is None:
             plan.unfixable.append(UnfixableViolation(v, "no safe version found within the cooldown window"))
             continue
-        plan.actions.append(
-            FixAction(package=v.name, version=v.safe_version.version, style=fix_style)
-        )
-    plan.actions = _dedupe_actions(plan.actions)
+        plan.actions.append(FixAction(package=v.name, version=v.safe_version.version, style=fix_style))
+    plan.actions = dedupe_actions(plan.actions)
     return plan
 
 
@@ -207,7 +221,7 @@ async def plan_fixes_async(
     report: CheckReport,
     ecosystem: Ecosystem,
     *,
-    config: CooldownConfig | None = None,
+    config: ChillOutConfig | None = None,
     http: httpx.AsyncClient | None = None,
     now: pendulum.DateTime | None = None,
 ) -> FixPlan:
@@ -228,7 +242,7 @@ async def plan_fixes_async(
        older principal version (out of cooldown, non-prerelease) whose
        declared range *does* admit the safe transitive. If found, emit pins
        for both the principal rollback and the transitive. If no compatible
-       older principal exists, record the violation in ``unfixable`` with a
+       older principal exists, record the violation in `unfixable` with a
        structured reason so the caller can show the user their options
        (downgrade the principal manually, raise the safe target, or wait
        out the cooldown).
@@ -241,12 +255,13 @@ async def plan_fixes_async(
     config = config or load_config(ecosystem.root, ecosystem.kind)
     now = now or pendulum.now("UTC")
     fix_style = config.fix_style
+    parser = ecosystem.parse_version
 
     own_http = http is None
     if own_http:
         http = httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
-    assert http is not None
-    client = CachingRegistryClient(ecosystem.make_client(http))
+    http = ChillOutError.enforce_defined(http, "internal error: http client was not initialized")
+    client = RegistryClient(ecosystem, http)
 
     installed_by_name: dict[str, InstalledPackage] = {p.name: p for p in report.checked}
 
@@ -255,12 +270,12 @@ async def plan_fixes_async(
 
         Shared transitive violations (multiple workspace members pull the
         same install in) need an override-style pin because a member-level
-        ``dependencies`` entry can't dislodge a sibling-shared copy. Direct
+        `dependencies` entry can't dislodge a sibling-shared copy. Direct
         violations on the current project's own manifest stay as plain pins
         even when the package happens to be shared, since the user
         explicitly declared it here.
 
-        Override-bound actions are forced to ``FixStyle.EXACT`` regardless
+        Override-bound actions are forced to `FixStyle.EXACT` regardless
         of the configured style, because the entire reason an override
         exists is to dodge a specific just-released version: a range there
         would let the resolver wander right back into the cooldown window.
@@ -273,9 +288,7 @@ async def plan_fixes_async(
     try:
         for v in report.violations:
             if v.safe_version is None:
-                plan.unfixable.append(
-                    UnfixableViolation(v, "no safe version found within the cooldown window")
-                )
+                plan.unfixable.append(UnfixableViolation(v, "no safe version found within the cooldown window"))
                 continue
             if not v.via:
                 plan.actions.append(pin(v, v.safe_version.version))
@@ -329,7 +342,9 @@ async def plan_fixes_async(
                     )
                 )
                 continue
-            candidate_versions = _candidate_principal_versions(principal_info, principal_pkg.version, config, now)
+            candidate_versions = candidate_principal_versions(
+                principal_info, principal_pkg.version, config, parser, now
+            )
             fetched = await asyncio.gather(*(client.fetch_version_manifest(v.via, ver) for ver in candidate_versions))
             manifests = {ver: m for ver, m in zip(candidate_versions, fetched, strict=True) if m is not None}
             principal_safe = find_safe_principal_version(
@@ -340,6 +355,7 @@ async def plan_fixes_async(
                 v.safe_version,
                 ecosystem.range_satisfies,
                 config,
+                parser,
                 now=now,
             )
             if principal_safe is None:
@@ -359,44 +375,39 @@ async def plan_fixes_async(
             # principal, which could land back on the conflicting version.
             # The paired transitive pin is also exact so the two halves of
             # the rollback can't drift apart on the next install.
-            plan.actions.append(
-                FixAction(package=v.via, version=principal_safe.version, style=FixStyle.EXACT)
-            )
-            plan.actions.append(
-                FixAction(package=v.name, version=v.safe_version.version, style=FixStyle.EXACT)
-            )
+            plan.actions.append(FixAction(package=v.via, version=principal_safe.version, style=FixStyle.EXACT))
+            plan.actions.append(FixAction(package=v.name, version=v.safe_version.version, style=FixStyle.EXACT))
     finally:
         if own_http:
             await http.aclose()
 
-    plan.actions = _dedupe_actions(plan.actions)
+    plan.actions = dedupe_actions(plan.actions)
     return plan
 
 
-def _candidate_principal_versions(
+def candidate_principal_versions(
     info: PackageInfo,
     installed_version: str,
-    config: CooldownConfig,
+    config: ChillOutConfig,
+    parser: VersionParser,
     now: pendulum.DateTime,
 ) -> list[str]:
     """
     Pick the set of principal versions worth fetching manifests for.
 
-    Strict subset of ``find_safe_principal_version``'s candidate filter that
+    Strict subset of `find_safe_principal_version`'s candidate filter that
     avoids the manifest fetch (which is only needed for the ones that survive
     the cooldown filter).
     """
-    from chill_out.cooldown import parse_version
-
-    current_v = parse_version(installed_version)
+    current_v = parser(installed_version)
     if current_v is None:
         return []
     out: list[str] = []
     for ver_str, release in info.releases.items():
-        v = parse_version(ver_str)
-        if v is None or v >= current_v or v.prerelease:
+        v = parser(ver_str)
+        if v is None or v >= current_v or v.is_prerelease:
             continue
-        rel_type = release_type(ver_str)
+        rel_type = release_type(ver_str, parser)
         violating, _, _ = is_within_cooldown(release.published, rel_type, config, now=now)
         if violating:
             continue
@@ -404,13 +415,11 @@ def _candidate_principal_versions(
     return out
 
 
-def _filter_by_groups(
-    packages: list[InstalledPackage], config: CooldownConfig
-) -> list[InstalledPackage]:
+def filter_by_groups(packages: list[InstalledPackage], config: ChillOutConfig) -> list[InstalledPackage]:
     """
-    Drop installed packages whose semantic groups don't intersect ``include_groups``.
+    Drop installed packages whose semantic groups don't intersect `include_groups`.
 
-    A package with an empty ``groups`` tuple is treated as "unknown origin"
+    A package with an empty `groups` tuple is treated as "unknown origin"
     and always kept; this preserves the historical behavior for ecosystem
     backends or test fixtures that don't attribute groups. Packages with at
     least one group are kept only when at least one of their groups is in
@@ -429,7 +438,7 @@ def _filter_by_groups(
     return out
 
 
-def _dedupe_actions(actions: Iterable[FixAction]) -> list[FixAction]:
+def dedupe_actions(actions: Iterable[FixAction]) -> list[FixAction]:
     """Deduplicate by package name, keeping the smallest version."""
     from packaging.version import InvalidVersion, Version
 
@@ -448,3 +457,203 @@ def _dedupe_actions(actions: Iterable[FixAction]) -> list[FixAction]:
             if a.version < existing.version:
                 out[key] = a
     return list(out.values())
+
+
+@dataclass
+class CleanupReport:
+    """Outcome of `cleanup_managed_pins`.
+
+    Each list holds the `ManagedPin` records the runner attempted to remove during cleanup,
+    grouped by the result the ecosystem returned. `removed` entries were successfully cleaned
+    out of the manifest. `drifted` entries are still present in the manifest but their value
+    differs from what chill-out wrote, so the ecosystem left them alone and the runner has
+    dropped them from state. `orphan` entries were no longer in the manifest at all and have
+    also been dropped from state.
+    """
+
+    removed: list[ManagedPin] = field(default_factory=list)
+    drifted: list[ManagedPin] = field(default_factory=list)
+    orphan: list[ManagedPin] = field(default_factory=list)
+
+
+def cleanup_managed_pins(eco: Ecosystem, state: ChillOutState) -> CleanupReport:
+    """Walk every pin in `state.managed_pins` and try to remove it from the project's manifests.
+
+    Mutates `state.managed_pins` in place: every entry is dropped regardless of outcome
+    (REMOVED, DRIFTED, and ORPHAN all leave nothing for chill-out to track going forward). The
+    returned `CleanupReport` lets the caller surface drift warnings to the user without
+    re-walking state.
+
+    The ecosystem is responsible for the per-pin manifest edit; this function does not
+    regenerate any lockfile. The caller is expected to trigger lockfile regeneration once after
+    cleanup so the project is in a consistent state before fresh fixes are applied.
+    """
+    report = CleanupReport()
+    for pin in list(state.managed_pins):
+        outcome = eco.remove_managed_pin(pin)
+        if outcome is RemovalOutcome.REMOVED:
+            report.removed.append(pin)
+        elif outcome is RemovalOutcome.DRIFTED:
+            report.drifted.append(pin)
+        else:
+            report.orphan.append(pin)
+    state.managed_pins = []
+    return report
+
+
+def build_managed_pins(
+    applied: AppliedFixes,
+    violations: Iterable[Violation],
+    config: ChillOutConfig,
+    *,
+    now: pendulum.DateTime | None = None,
+) -> list[ManagedPin]:
+    """Build the `ManagedPin` records that should be saved into state for one fix run.
+
+    Pairs every `AppliedFix` from `applied.entries` with the `Violation` that motivated it
+    (matched by package name) so the resulting `AvoidingRelease` snapshot captures why the pin
+    exists. Pins for which no matching violation can be found are skipped, since chill-out has
+    no avoiding-metadata to attach.
+
+    `config` is consulted to derive the cooldown window for the violation's release type so the
+    snapshot reflects the policy in force at the time the pin was written.
+    """
+    timestamp = now if now is not None else pendulum.now("UTC")
+    by_name: dict[str, Violation] = {}
+    for v in violations:
+        # Multiple violations for the same package would be unusual, but if it ever happens,
+        # the first wins; the structured AppliedFix already carries the action that ran.
+        by_name.setdefault(v.name, v)
+
+    pins: list[ManagedPin] = []
+    for entry in applied.entries:
+        violation = by_name.get(entry.action.package)
+        if violation is None:
+            continue
+        cooldown_days = config.for_release_type(violation.release_type)
+        pins.append(
+            ManagedPin(
+                package=entry.action.package,
+                ecosystem=violation.package.ecosystem,
+                mechanism=PinMechanism.OVERRIDE if entry.via_overrides else PinMechanism.DIRECT,
+                manifest_path=entry.manifest_path,
+                pinned_spec=entry.pinned_spec,
+                applied_at=timestamp,
+                avoiding=AvoidingRelease(
+                    version=violation.version,
+                    release_type=violation.release_type,
+                    published_at=violation.published,
+                    cooldown_days=cooldown_days,
+                ),
+            )
+        )
+    return pins
+
+
+async def audit_one(
+    pin: ManagedPin,
+    client: RegistryClient,
+    config: ChillOutConfig,
+    semaphore: asyncio.Semaphore,
+    *,
+    now: pendulum.DateTime,
+) -> AuditedPin:
+    """
+    Look up the avoided release's current state for one managed pin.
+
+    The audit is a read-only lookup: it asks the registry whether the
+    release the pin is dodging has cleared its cooldown window or been
+    pulled outright, and slots the result into one of the four
+    `AuditStatus` buckets. The current `config` drives the cooldown
+    threshold so the verdict matches what `chill-out fix --cleanup` would
+    do on its next run.
+    """
+    cooldown_days = config.for_release_type(pin.avoiding.release_type)
+    async with semaphore:
+        try:
+            info = await client.fetch_package(pin.package)
+        except RegistryError as exc:
+            return AuditedPin(
+                pin=pin,
+                status=AuditStatus.UNKNOWN,
+                current_age_days=None,
+                cooldown_days=cooldown_days,
+                detail=str(exc),
+            )
+
+    if info is None:
+        return AuditedPin(
+            pin=pin,
+            status=AuditStatus.UNKNOWN,
+            current_age_days=None,
+            cooldown_days=cooldown_days,
+            detail="package not found in registry",
+        )
+
+    release = info.releases.get(pin.avoiding.version)
+    if release is None:
+        return AuditedPin(
+            pin=pin,
+            status=AuditStatus.UNKNOWN,
+            current_age_days=None,
+            cooldown_days=cooldown_days,
+            detail=f"version {pin.avoiding.version} not present in registry response",
+        )
+
+    age_days = (now - release.published).in_days()
+
+    if release.yanked:
+        return AuditedPin(
+            pin=pin,
+            status=AuditStatus.YANKED,
+            current_age_days=age_days,
+            cooldown_days=cooldown_days,
+        )
+
+    violating, _, _ = is_within_cooldown(release.published, pin.avoiding.release_type, config, now=now)
+    status = AuditStatus.FRESH if violating else AuditStatus.STALE
+    return AuditedPin(
+        pin=pin,
+        status=status,
+        current_age_days=age_days,
+        cooldown_days=cooldown_days,
+    )
+
+
+async def audit_async(
+    state: ChillOutState,
+    ecosystem: Ecosystem,
+    *,
+    config: ChillOutConfig | None = None,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    http: httpx.AsyncClient | None = None,
+    now: pendulum.DateTime | None = None,
+) -> AuditReport:
+    """
+    Audit every managed pin in `state` against the live registry.
+
+    Builds one `AuditedPin` per entry in `state.managed_pins`, preserving
+    the state file's order so the resulting report mirrors the user's
+    mental model of the file. The lookup is read-only; nothing on disk is
+    touched. The caller decides what to do with the result -- typically
+    print a summary table and exit with a status code.
+
+    Owns the `httpx.AsyncClient` only when one isn't supplied, mirroring
+    `check_async`'s ownership rules.
+    """
+    if config is None:
+        config = load_config(ecosystem.root, ecosystem.kind)
+    now = now or pendulum.now("UTC")
+    semaphore = asyncio.Semaphore(concurrency)
+
+    own_http = http is None
+    http_client = http if http is not None else httpx.AsyncClient(timeout=DEFAULT_TIMEOUT)
+    try:
+        client = RegistryClient(ecosystem, http_client)
+        tasks = [audit_one(pin, client, config, semaphore, now=now) for pin in state.managed_pins]
+        entries = list(await asyncio.gather(*tasks)) if tasks else []
+    finally:
+        if own_http:
+            await http_client.aclose()
+
+    return AuditReport(ecosystem=ecosystem.kind, entries=entries)

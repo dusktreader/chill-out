@@ -23,8 +23,6 @@ The script:
    pristine, and prints the resulting `pyproject.toml`.
 """
 
-from __future__ import annotations
-
 import asyncio
 import shutil
 import subprocess
@@ -39,7 +37,7 @@ import respx
 from chill_out import PypiEcosystem, check_async, plan_fixes_async
 from chill_out.config import load_config
 from chill_out.constants import EcosystemKind
-from chill_out.ecosystems.pypi import PYPI_REGISTRY
+from chill_out.ecosystems.constants import PYPI_REGISTRY
 
 PROJECT_ROOT = Path(__file__).parent
 NOW = pendulum.datetime(2026, 1, 1, tz="UTC")
@@ -129,9 +127,7 @@ PACKAGES: dict[str, dict[str, Any]] = {
 def _seed_registry() -> None:
     """Wire respx mocks for the package index and per-version manifests."""
     for name, data in PACKAGES.items():
-        releases_payload = {
-            ver: [{"upload_time_iso_8601": iso}] for ver, iso in data["releases"].items()
-        }
+        releases_payload = {ver: [{"upload_time_iso_8601": iso}] for ver, iso in data["releases"].items()}
         respx.get(f"{PYPI_REGISTRY}/{name}/json").mock(
             return_value=httpx.Response(200, json={"releases": releases_payload}),
         )
@@ -162,7 +158,7 @@ def main() -> None:
     config = load_config(PROJECT_ROOT, EcosystemKind.PYPI)
 
     ecosystem = PypiEcosystem(PROJECT_ROOT)
-    report = asyncio.run(check_async(ecosystem, config=config, deep=True, now=NOW))
+    report = asyncio.run(check_async(ecosystem, config=config, now=NOW))
     actions = asyncio.run(plan_fixes_async(report, ecosystem, config=config, now=NOW))
 
     print("=" * 70)
@@ -197,10 +193,10 @@ def main() -> None:
         tmp = Path(raw_tmp) / "python-app-copy"
         shutil.copytree(PROJECT_ROOT, tmp)
         copy_eco = PypiEcosystem(tmp)
-        with patch("chill_out.ecosystems.pypi.subprocess.run", side_effect=_fake_subprocess_run):
+        with patch("chill_out.ecosystems.pypi.backend.subprocess.run", side_effect=_fake_subprocess_run):
             applied = copy_eco.apply_fixes(actions.actions)
         print("apply log:")
-        for line in applied:
+        for line in applied.log:
             print(f"  - {line}")
         patched = (tmp / "pyproject.toml").read_text()
         print()

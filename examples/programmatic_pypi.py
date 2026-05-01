@@ -10,8 +10,6 @@ Run it with::
     uv run python examples/programmatic_pypi.py
 """
 
-from __future__ import annotations
-
 import asyncio
 import tempfile
 from pathlib import Path
@@ -19,8 +17,9 @@ from pathlib import Path
 import httpx
 import pendulum
 import respx
+import tomlkit
 from chill_out import PypiEcosystem, check_async, plan_fixes
-from chill_out.ecosystems.pypi import PYPI_REGISTRY
+from chill_out.ecosystems.constants import PYPI_REGISTRY
 
 
 def _iso(days_ago: int) -> str:
@@ -44,16 +43,31 @@ def main() -> None:
 
     with tempfile.TemporaryDirectory() as raw_tmp:
         root = Path(raw_tmp)
-        (root / "pyproject.toml").write_text(
-            '[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = ["example-pkg==2.0.0"]\n'
-        )
+        pyproject = {
+            "project": {
+                "name": "demo",
+                "version": "0.1.0",
+                "dependencies": ["example-pkg==2.0.0"],
+            },
+        }
+        (root / "pyproject.toml").write_text(tomlkit.dumps(pyproject))
+        # chill-out audits the lockfile end-to-end, so we need one. A real
+        # project would get this from `uv lock`; here we hand-build the
+        # minimum viable lockfile that lists the package we're checking.
+        lockfile = {
+            "version": 1,
+            "package": [{"name": "example-pkg", "version": "2.0.0"}],
+        }
+        (root / "uv.lock").write_text(tomlkit.dumps(lockfile))
 
         ecosystem = PypiEcosystem(root)
         report = asyncio.run(check_async(ecosystem))
 
     print(f"Checked {len(report.checked)} package(s); {len(report.violations)} violation(s).")
     for v in report.violations:
-        print(f"  - {v.name}=={v.version}  release_type={v.release_type.value}  age={v.age_days}d  limit={v.limit_days}d")
+        print(
+            f"  - {v.name}=={v.version}  release_type={v.release_type.value}  age={v.age_days}d  limit={v.limit_days}d"
+        )
         if v.safe_version:
             print(f"    safe rollback: {v.safe_version.version} ({v.safe_version.age_days}d old)")
 

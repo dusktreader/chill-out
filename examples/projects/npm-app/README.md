@@ -1,15 +1,13 @@
 # npm-app: chill-out example project
 
-A self-contained npm project that chill-out can audit. The fixture is
-intentionally constructed so a deep check finds two violations:
+A self-contained npm project that chill-out can audit. The fixture is intentionally constructed so a lockfile audit
+finds two violations:
 
-- `chalk@5.4.0` is a fresh direct dependency that sits inside the cooldown
-  window, so chill-out proposes pinning it back to `5.3.0`.
-- `lodash.merge@4.6.3` is a fresh transitive of `lodash`. The installed
-  `lodash@4.17.21` declares its merge transitive with a tight range that
-  doesn't admit `4.6.2`, so chill-out's principal-rollback path picks an
-  older `lodash` whose declared range does and emits both the principal pin
-  and the transitive pin as direct entries.
+- `chalk@5.4.0` is a fresh direct dependency that sits inside the cooldown window, so chill-out proposes pinning it back
+  to `5.3.0`.
+- `lodash.merge@4.6.3` is a fresh transitive of `lodash`. The installed `lodash@4.17.21` declares its merge transitive
+  with a tight range that doesn't admit `4.6.2`, so chill-out's principal-rollback path picks an older `lodash` whose
+  declared range does and emits both the principal pin and the transitive pin as direct entries.
 
 Run the demo from the repository root:
 

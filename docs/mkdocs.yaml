@@ -42,8 +42,11 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - Configuration: configuration.md
+  - State file: state-file.md
   - Ecosystems: ecosystems.md
   - Comparison: comparison.md
+  - Case study: case-study.md
+  - How it works: how-it-works.md
   - CLI: cli.md
   - Programmatic API: api.md
   - GitHub Actions: github-actions.md
@@ -68,6 +71,8 @@ plugins:
           show_signature_annotations: true
           show_source: false
           docstring_style: google
+          extensions:
+            - griffe_pydantic
 markdown_extensions:
   - admonition:
   - attr_list:
