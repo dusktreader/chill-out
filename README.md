@@ -26,6 +26,7 @@ each package was published, and tells you which entries (principals and transiti
 cooldown window. When it can, it suggests an older version that is safely past its cooldown, or fixes your locked
 dependencies outright to eliminate the threat.
 
+
 ## Super-quick start
 
 Requires: Python 3.12+
@@ -46,9 +47,24 @@ To rewrite your manifest with safe pins:
 chill-out fix
 ```
 
+
 ## Documentation
 
 The complete documentation lives at the [chill-out home page](https://dusktreader.github.io/chill-out).
+
+
+## GitHub Actions
+
+[`chill-out-action`](https://github.com/dusktreader/chill-out-action) is the fastest way to add cooldown
+enforcement to CI. One step, no setup:
+
+```yaml
+- uses: dusktreader/chill-out-action@v1
+```
+
+See the [GitHub Actions docs](https://dusktreader.github.io/chill-out/github-actions/) for trigger patterns
+and automated fix PR setup.
+
 
 ## Demo
 

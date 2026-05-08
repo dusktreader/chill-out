@@ -1,15 +1,21 @@
 # GitHub Actions
 
-`chill-out` is built to run in CI. The check is read-only against your manifest, exits with a stable code, and prints a
-self-contained report, which is everything a CI job needs.
+![chill-out-action](images/chill-action-600.png)
 
-This page collects a few recipes, ranging from "drop this in and you're done" to "I want a separate scheduled job that
-opens an issue when something trips."
+`chill-out` is built to run in CI. The check is read-only against your lockfile,
+exits with a stable code, and prints a self-contained report.
+
+The fastest way to wire it up is [`chill-out-action`](https://github.com/dusktreader/chill-out-action),
+a composite action that handles setup, runs the CLI, and (optionally) opens a fix PR for you.
+If you need more control than the action exposes, the [manual setup](#manual-setup) section
+covers calling the CLI directly.
 
 
-## The minimal recipe
+## chill-out-action
 
-The smallest workflow that catches uncooled dependencies on every pull request:
+### Check on every pull request
+
+Block a merge if any dependency is too fresh to trust:
 
 ```yaml
 # .github/workflows/cooldown.yml
@@ -24,90 +30,129 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv tool install chill-out
-      - run: chill-out check --quiet
+      - uses: dusktreader/chill-out-action@v1
 ```
 
-`uv tool install chill-out` puts the CLI on `PATH` without polluting the project's environment. `--quiet` drops the
-threshold table from the top of the report so the log stays focused on the violations.
+That's the whole workflow. The action auto-detects your ecosystem, installs the CLI
+via `uvx`, and exits non-zero on any cooldown violation.
 
-If a violation appears, the step exits with code `2` and the report is in the log. No fix is attempted, no manifest is
-written, no commit is created.
+Pass `fast: true` if you only need pass/fail on PRs and want to skip the safe-version
+lookup (saves a registry round-trip per violating package):
+
+```yaml
+- uses: dusktreader/chill-out-action@v1
+  with:
+    fast: true
+```
+
+
+### Scheduled fix PR
+
+Run on a schedule, pin any violations automatically, and open a PR:
+
+```yaml
+# .github/workflows/cooldown-fix.yml
+name: Cooldown fix
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"  # every Monday morning
+  workflow_dispatch:
+
+jobs:
+  chill-out:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dusktreader/chill-out-action@v1
+        with:
+          command: fix
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+When violations are found, the action commits the pinned lockfile to a
+`fix/chill-out-<timestamp>` branch and opens a PR against the default branch.
+If a fix PR is already open, it reuses that branch instead of opening a duplicate.
+
+See the [`chill-out-action` README](https://github.com/dusktreader/chill-out-action)
+for the full input/output reference.
 
 
 ## Picking when to run
 
-A few patterns, ordered by how aggressive they are:
+The right trigger depends on how much friction you want and how quickly you need to know.
+Each pattern below works with either `chill-out-action` or the manual setup.
 
-**On every pull request.** What the minimal recipe does. Catches a bad release the moment a contributor tries to bump
-it, before the merge. Adds a few seconds of registry round-trips to every PR.
+The examples shown here don't conflict. A fast PR gate, a nightly audit, and an on-push
+sanity check can coexist in separate workflow files.
 
-**On every push to `main`.** Same job, swap the trigger. Cheaper if you already gate merges on a green main, but you
-only learn about a bad release after it's landed.
 
-**On a schedule.** Best fit for projects whose dependencies you don't touch often. A daily cron run notices when an
-already-installed dependency suddenly trips a fresh release downstream:
+### On every pull request
+
+Catches a bad release the moment a contributor tries to bump it, before the merge.
+Adds a few seconds of registry round-trips to every PR.
+
+```yaml
+on:
+  pull_request:
+    branches: [main]
+```
+
+
+### On every push to `main`
+
+Same job, different trigger. You only learn about a bad release after it's landed,
+but it's cheaper if you already gate merges on a green main.
+
+```yaml
+on:
+  push:
+    branches: [main]
+```
+
+
+### On a schedule
+
+Best fit for projects whose dependencies you don't touch often. A weekly or daily
+run notices when an already-installed dependency trips a fresh release downstream.
+Pair it with `command: fix` to get automatic remediation PRs.
 
 ```yaml
 on:
   schedule:
-    - cron: "0 13 * * *" # 13:00 UTC every day
+    - cron: "0 9 * * 1"  # every Monday morning
   workflow_dispatch:
 ```
 
-A scheduled run paired with an issue-opening step is the classic "alert me when my supply chain shifts" pattern. Since
-`chill-out` always audits the full lockfile (principals and transitives together), the scheduled job is the same
-`chill-out check` invocation as the PR gate. The difference is the trigger, not the flags.
+----
 
-**All three.** The combinations don't conflict; you can have a fast PR gate, a scheduled nightly audit, and an on-push
-sanity check coexisting in different workflow files.
+## Manual setup
 
-
-## Speed knobs in CI
-
-`chill-out check` makes one registry call per checked package, plus one more per violation when it computes a safe
-rollback. For most projects that's a couple of seconds end-to-end. `--fast` skips the safe-version lookup, so PR gates
-that only need pass/fail can save one extra registry round trip per violating package; the report still names the
-violating package, it just doesn't suggest a rollback target. A typical split is `--fast` on PRs and no `--fast` on the
-nightly cron where you want the rollback suggestions in the issue body.
-
-
-## Failing the build, but separately
-
-A common ask: "I want CI to know when chill-out is unhappy, but I don't want a fresh upstream release to fail unrelated
-PRs." The answer is to put the cooldown check in its own job (or its own workflow), so its red cross is visible without
-blocking the main test matrix:
+If you need control the action doesn't expose, call the CLI directly:
 
 ```yaml
 jobs:
-  test:
-    # ... your existing test matrix
   chill-out:
     runs-on: ubuntu-latest
-    continue-on-error: true # warn-only
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv tool install chill-out
-      - run: chill-out check
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx chill-out check
 ```
 
-`continue-on-error: true` lets the job report failure on its summary without marking the workflow as failed. Drop it
-once you trust the signal.
-
-
-## Opening an issue when something trips
-
-Pair the check with `peter-evans/create-issue-from-file` or a bare `gh` call to surface violations as tracked work:
+The manual approach is also useful when you want to compose chill-out with other
+steps that inspect its output, like opening an issue when a violation is found:
 
 ```yaml
 - name: Run cooldown check
   id: chill
-  run: chill-out check > chill-out-report.txt
+  run: uvx chill-out check > chill-out-report.txt
   continue-on-error: true
 
-- name: Open an issue if a violation was found
+- name: Open issue on violation
   if: steps.chill.outcome == 'failure'
   env:
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -118,93 +163,32 @@ Pair the check with `peter-evans/create-issue-from-file` or a bare `gh` call to 
       --label "dependencies"
 ```
 
-Capturing the report to a file keeps the issue body grounded in the actual run rather than a hand-written summary that
-drifts.
+Capturing the report to a file keeps the issue body grounded in the actual run.
 
 
-## Scheduled cleanup pull requests
+## Warn-only mode
 
-Once you've been running `chill-out fix` for a while, your `.chill-out-state.json` accumulates pins for releases that
-were too fresh at the time. Most of those releases will eventually clear cooldown, and at that point the pin is just
-holding you back from upgrading. `chill-out fix --cleanup` (the default) handles this on demand, but a scheduled job
-that opens a PR when there's cleanup to do means you don't have to remember.
-
-The trick is the split between `chill-out audit` (read-only, exits `7` when there's cleanup waiting) and `chill-out fix`
-(does the actual cleanup, exits `0` when it's done). `audit` is the trigger; `fix` is the action.
+To make the cooldown check visible without blocking unrelated PRs, put it in its
+own job with `continue-on-error: true`:
 
 ```yaml
-# .github/workflows/cooldown-cleanup.yml
-name: Cooldown cleanup PR
-
-on:
-  schedule:
-    - cron: "0 13 * * 1" # 13:00 UTC every Monday
-  workflow_dispatch:
-
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  cleanup:
+  test:
+    # ... your existing test matrix
+  chill-out:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - run: uv tool install chill-out
-
-      - name: See if any pins are ready to retire
-        id: audit
-        run: chill-out audit
-        continue-on-error: true
-
-      - name: Run cleanup when audit flagged something
-        if: steps.audit.outcome == 'failure'
-        run: chill-out fix
-
-      - name: Open a PR with the cleanup
-        if: steps.audit.outcome == 'failure'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          branch: chill-out/cleanup
-          title: "chill-out: retire pins that have cleared cooldown"
-          commit-message: "chill-out: retire pins that have cleared cooldown"
-          body: |
-            Scheduled cleanup PR opened by the `chill-out audit` workflow.
-            Every pin retired here was confirmed by the registry to have either
-            cleared its cooldown window or been yanked outright. Review the
-            manifest diff and merge when CI is green.
-          labels: dependencies, chill-out
+      - uses: dusktreader/chill-out-action@v1
 ```
 
-A few things worth knowing:
-
-- `chill-out audit` exits `7` only when at least one pin is stale or yanked, which trips `continue-on-error` and lets
-  the next two steps gate on `outcome == 'failure'`. Pure-fresh runs exit `0` and the job is a no-op.
-- `chill-out fix` runs the cooldown check first. Anything currently inside its window stays pinned; only the cleared
-  pins get retired. The PR diff stays small and predictable.
-- The branch name is fixed (`chill-out/cleanup`), so re-running while a PR is already open updates the existing branch
-  instead of opening a second one.
-- `permissions:` has to grant `contents: write` and `pull-requests: write` for `create-pull-request` to push and open.
-- `audit` exit code `7` is distinct from `check`'s `2`. CI can tell "your installed dependencies violate cooldown" apart
-  from "your state file has cleanup work waiting" without parsing the report.
-
-If you want `chill-out` to also fix any fresh violations the cleanup uncovered, the `chill-out fix` step already does
-that: cleanup runs first, then a fresh check, then any new pins. The audit-then-fix split keeps the workflow honest
-about why the PR is being opened.
-
-
-## A real-world example
-
-`chill-out` runs `chill-out check` against its own dependencies in its CI pipeline. The check is part of the `qa/full`
-make target, so the same command runs locally and in GitHub Actions. The wired-up workflow lives at
-[`.github/workflows/main.yml`](https://github.com/dusktreader/chill-out/blob/main/.github/workflows/main.yml) and the
-make target is in the [Makefile](https://github.com/dusktreader/chill-out/blob/main/Makefile).
+Drop `continue-on-error` once you trust the signal.
 
 
 ## Next stops
 
-- [CLI](cli.md) for every flag the workflow examples pass to `chill-out check` and `chill-out fix`
+- [CLI](cli.md) for every flag the workflow examples pass to `chill-out`
 - [Configuration](configuration.md) for the config files the workflows read at runtime
 - [Examples](examples.md) for end-to-end recipes built around the same commands
 - [Comparison](comparison.md) for how chill-out slots in alongside Dependabot or Renovate
